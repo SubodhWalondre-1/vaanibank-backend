@@ -1,0 +1,75 @@
+{
+  "intent": "VEHICLE_LOAN",
+  "product_name": "Union Bank of India Vehicle Loan",
+  "tagline": "Union Vehicle Loan — Your Vehicle, Your Choice",
+  "last_updated": "2024-01",
+
+  "types": [
+    {
+      "name": "Union Vehicle Loan — New Car",
+      "interest_rate": "8.70% p.a. onwards",
+      "max_loan": "100% on-road price (for select models)",
+      "general_ltv": "85-90% of on-road price",
+      "tenure": "Up to 7 years"
+    },
+    {
+      "name": "Union Vehicle Loan — Used Car",
+      "interest_rate": "10.50% p.a. onwards",
+      "max_loan": "85% of valuation (vehicle age max 5 years old)",
+      "tenure": "Up to 5 years"
+    },
+    {
+      "name": "Union Two Wheeler Loan",
+      "interest_rate": "10.90% p.a. onwards",
+      "max_loan": "85% of on-road price",
+      "tenure": "Up to 4 years"
+    },
+    {
+      "name": "Union EV Loan (Electric Vehicle)",
+      "interest_rate": "Special rate — 0.25% concession on standard car loan rate",
+      "benefit": "Green initiative — lower rate for EV purchase",
+      "tenure": "Up to 7 years"
+    }
+  ],
+
+  "eligibility": {
+    "age":         "21 to 65 years",
+    "income":      "₹20,000/month net (salaried) / ₹2.4 Lakh/year ITR (self-employed)",
+    "cibil":       "700+",
+    "employment":  "Salaried (1+ year current employer) / Self-employed (2+ years)"
+  },
+
+  "documents_required": {
+    "kyc":    ["Aadhaar", "PAN", "Address proof"],
+    "income": ["3 months salary slips", "6 months bank statement", "ITR (self-employed)"],
+    "vehicle":["Proforma Invoice from dealer", "Driving Licence (mandatory)", "Registration Certificate (used car)"]
+  },
+
+  "processing_fee": {
+    "new_vehicle": "₹1,000 + GST (flat)",
+    "used_vehicle": "1% of loan amount + GST"
+  },
+
+  "prepayment": "NIL charges on floating rate loans",
+
+  "process_steps": [
+    { "step": 1, "title": "Vehicle & Dealer Confirm", "detail": "Obtain proforma invoice from authorized dealer" },
+    { "step": 2, "title": "Eligibility Check",        "detail": "Verify income, CIBIL, and age" },
+    { "step": 3, "title": "Documents Submit",          "detail": "KYC + income + vehicle docs" },
+    { "step": 4, "title": "Sanction",                 "detail": "2-5 working days" },
+    { "step": 5, "title": "Disbursement",             "detail": "Directly to dealer account — customer drives away" }
+  ],
+
+  "emi_examples": [
+    { "loan": "₹5 Lakh",  "tenure": "5 years", "rate": "8.70%", "emi": "~₹10,300/month" },
+    { "loan": "₹8 Lakh",  "tenure": "7 years", "rate": "8.70%", "emi": "~₹12,700/month" },
+    { "loan": "₹15 Lakh", "tenure": "7 years", "rate": "8.70%", "emi": "~₹23,800/month" }
+  ],
+
+  "staff_tips": [
+    "EV buyers get an extra 0.25% rate concession — always mention this",
+    "100% financing is available on select models — confirm with the dealer",
+    "For used cars, valuation is done first — check RC and insurance",
+    "Driving licence is mandatory — DL is compulsory for the loan (registration authority requirement)"
+  ]
+}

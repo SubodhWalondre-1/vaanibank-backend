@@ -1,0 +1,213 @@
+{
+  "intent": "HOME_LOAN",
+  "product_name": "Union Bank of India Home Loan",
+  "tagline": "Union Home — Your Home, Your Dream",
+  "last_updated": "2024-01",
+
+  "interest_rates": {
+    "note": "Linked to RLLR (Repo Linked Lending Rate)",
+    "RLLR": "8.90%",
+    "slabs": [
+      { "cibil": "800 and above", "rate": "8.35% p.a.", "type": "Floating" },
+      { "cibil": "750-799",       "rate": "8.50% p.a.", "type": "Floating" },
+      { "cibil": "700-749",       "rate": "8.75% p.a.", "type": "Floating" },
+      { "cibil": "650-699",       "rate": "9.25% p.a.", "type": "Floating" },
+      { "cibil": "Below 650",     "rate": "Application generally not processed", "type": "N/A" }
+    ]
+  },
+
+  "loan_limits": {
+    "metro_urban": "Up to ₹5 Crore",
+    "semi_urban":  "Up to ₹2 Crore",
+    "rural":       "Up to ₹75 Lakh",
+    "minimum":     "₹1 Lakh"
+  },
+
+  "ltv_ratio": [
+    { "loan_amount": "Up to ₹30 Lakh",          "max_ltv": "90% of property value" },
+    { "loan_amount": "₹30L to ₹75L",             "max_ltv": "80% of property value" },
+    { "loan_amount": "Above ₹75 Lakh",           "max_ltv": "75% of property value" }
+  ],
+
+  "tenure": {
+    "maximum": "30 years",
+    "minimum": "5 years",
+    "note": "Loan tenure + applicant's age must be ≤ 70"
+  },
+
+  "eligibility": {
+    "age": {
+      "minimum": "21 years",
+      "maximum": "70 years (at loan maturity)"
+    },
+    "employment_types": ["Salaried (Govt / PSU / Private)", "Self-Employed Professional", "Self-Employed Non-Professional", "NRI / PIO (special scheme)"],
+    "minimum_income": {
+      "salaried":      "₹25,000 per month net take-home",
+      "self_employed": "₹2,50,000 per year (ITR basis)"
+    },
+    "cibil_minimum": "700",
+    "work_experience": {
+      "salaried":      "Minimum 2 years continuous employment",
+      "self_employed": "Minimum 3 years in the same business"
+    },
+    "co_applicant": "Adding spouse, parents, or children as co-applicant is encouraged — it increases eligibility"
+  },
+
+  "documents_required": {
+    "identity_proof": ["Aadhaar Card", "PAN Card (mandatory)", "Passport", "Voter ID", "Driving Licence"],
+    "address_proof":  ["Aadhaar Card", "Utility Bill (electricity/telephone)", "Passport", "Ration Card"],
+    "income_documents": {
+      "salaried": [
+        "Last 3 months salary slips",
+        "Form 16 (last 2 years)",
+        "ITR last 2 years (if available)",
+        "6 months bank statement (salary account)",
+        "Appointment letter / Employment certificate"
+      ],
+      "self_employed": [
+        "ITR last 3 years with computation",
+        "CA-certified Profit & Loss statement",
+        "Balance Sheet last 3 years",
+        "Business proof (GST registration / trade licence)",
+        "12 months bank statement (business account)"
+      ],
+      "pensioner": [
+        "Pension Payment Order (PPO)",
+        "Last 3 months pension slips",
+        "Bank statement showing pension credit"
+      ]
+    },
+    "property_documents": [
+      "Sale agreement / Allotment letter",
+      "Title deed / Chain of title documents",
+      "Approved building plan & layout",
+      "NOC from builder / society",
+      "Property tax receipts",
+      "Encumbrance certificate (EC) — last 13 years",
+      "Occupancy Certificate (for ready property)"
+    ]
+  },
+
+  "processing_fee": {
+    "percentage": "0.50% of loan amount",
+    "minimum": "₹7,500",
+    "maximum": "₹15,000",
+    "gst": "18% GST extra on processing fee",
+    "waiver": "Waiver possible during special campaigns — confirm with the branch"
+  },
+
+  "prepayment_charges": {
+    "floating_rate": "NIL — no prepayment penalty",
+    "fixed_rate":    "2% of outstanding amount"
+  },
+
+  "special_schemes": [
+    {
+      "name": "Union Ashiyana Home Loan",
+      "for": "EWS / LIG category (Economically Weaker Section)",
+      "benefit": "Subsidy under PMAY (Pradhan Mantri Awas Yojana)",
+      "subsidy_amount": "Up to ₹2.67 Lakh (EWS), Up to ₹2.35 Lakh (LIG)",
+      "income_limit": "EWS: ₹3L/year, LIG: ₹6L/year"
+    },
+    {
+      "name": "Union Home for Women",
+      "for": "Female applicant/co-applicant",
+      "benefit": "0.05% concession in interest rate"
+    },
+    {
+      "name": "Union Home for Govt Employees",
+      "for": "Central/State Govt salaried employees",
+      "benefit": "Special processing, faster sanction"
+    },
+    {
+      "name": "Union NRI Home Loan",
+      "for": "Non-Resident Indians",
+      "benefit": "Loan for property in India, EMI via NRE/NRO account"
+    }
+  ],
+
+  "process_steps": [
+    {
+      "step": 1,
+      "title": "Eligibility Check",
+      "step_text_hindi": "ग्राहक की आयु, आय, सिबिल स्कोर और रोजगार का प्रकार सत्यापित करें।",
+      "detail": "Verify the customer's age, income, CIBIL score, and employment type",
+      "staff_action": "Pull CIBIL score (with consent), calculate income eligibility",
+      "time": "10-15 minutes"
+    },
+    {
+      "step": 2,
+      "title": "Loan Amount Calculation",
+      "step_text_hindi": "अधिकतम पात्र ऋण की गणना करें। ग्राहक को विभिन्न अवधि विकल्प दिखाएँ।",
+      "detail": "Max eligible loan = 60x monthly net income (salaried). Calculate LTV ratio from property value",
+      "staff_action": "Use EMI calculator, show customer different tenure options",
+      "time": "5-10 minutes"
+    },
+    {
+      "step": 3,
+      "title": "Document Collection",
+      "step_text_hindi": "सभी आवश्यक दस्तावेज़ एकत्र करें। मूल दस्तावेज़ जाँचें और फ़ोटोकॉपी रखें।",
+      "detail": "Collect all listed documents — verify originals, keep photocopies",
+      "staff_action": "Print document checklist and give to customer",
+      "time": "Depends on customer"
+    },
+    {
+      "step": 4,
+      "title": "Property Legal & Technical Verification",
+      "step_text_hindi": "बैंक के अधिकृत वकील से कानूनी राय और बैंक-अनुमोदित मूल्यांकक से संपत्ति का मूल्यांकन करवाएँ।",
+      "detail": "Legal opinion from bank-empanelled lawyer and property valuation from bank-approved valuer",
+      "staff_action": "Request legal opinion and valuation report",
+      "time": "7-10 working days"
+    },
+    {
+      "step": 5,
+      "title": "Application Processing",
+      "step_text_hindi": "सभी दस्तावेज़ों के साथ शाखा या पोर्टल पर औपचारिक आवेदन जमा करें।",
+      "detail": "Submit formal application with all documents at branch or portal",
+      "staff_action": "Generate CIF number, create application file",
+      "time": "2-3 working days"
+    },
+    {
+      "step": 6,
+      "title": "Sanction",
+      "step_text_hindi": "ऋण समिति से अनुमोदन के बाद स्वीकृति पत्र जारी किया जाएगा।",
+      "detail": "Approval from credit team, Sanction Letter will be issued",
+      "staff_action": "Explain the sanction letter to customer — terms & conditions",
+      "time": "7-15 working days (after complete documentation)"
+    },
+    {
+      "step": 7,
+      "title": "Agreement & Registration",
+      "step_text_hindi": "ऋण अनुबंध पर हस्ताक्षर होंगे और संपत्ति बंधक पंजीकृत की जाएगी।",
+      "detail": "Loan agreement will be executed, property mortgage will be registered (MODT)",
+      "staff_action": "Guide on stamp duty payment, accompany for registration",
+      "time": "2-5 working days"
+    },
+    {
+      "step": 8,
+      "title": "Loan Disbursement",
+      "step_text_hindi": "निर्माणाधीन संपत्ति के लिए किस्तों में और तैयार संपत्ति के लिए पूरी राशि सीधे विक्रेता को दी जाएगी।",
+      "detail": "Under-construction: tranche-wise disbursement. Ready property: full disbursement directly to seller/builder",
+      "staff_action": "Fill disbursement request form, confirm cheque/NEFT details",
+      "time": "1-2 working days after agreement"
+    }
+  ],
+
+  "emi_examples": [
+    { "loan": "₹20 Lakh", "tenure": "20 years", "rate": "8.35%", "emi": "~₹17,210/month" },
+    { "loan": "₹30 Lakh", "tenure": "20 years", "rate": "8.35%", "emi": "~₹25,815/month" },
+    { "loan": "₹50 Lakh", "tenure": "20 years", "rate": "8.35%", "emi": "~₹43,025/month" }
+  ],
+
+  "tax_benefits": {
+    "section_80C": "Deduction up to ₹1.5 Lakh on principal repayment",
+    "section_24B": "Deduction up to ₹2 Lakh on interest (self-occupied property)",
+    "section_80EEA": "First-time buyer: ₹1.5 Lakh extra interest deduction (affordable housing)"
+  },
+
+  "helpline": {
+    "toll_free": "1800-22-2244",
+    "email": "unionhomeloans@unionbankofindia.com",
+    "portal": "https://www.unionbankofindia.co.in"
+  }
+}

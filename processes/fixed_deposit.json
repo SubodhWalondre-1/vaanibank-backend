@@ -1,0 +1,164 @@
+{
+  "intent": "FIXED_DEPOSIT",
+  "product_name": "Union Bank of India Fixed Deposit",
+  "tagline": "Safe Savings, Guaranteed Returns",
+  "last_updated": "2024-01",
+
+  "interest_rates": {
+    "note": "Senior citizens get an additional 0.50%. Rates change with RBI policy updates.",
+    "slabs": [
+      { "tenure": "7 days to 14 days",       "general": "3.00%", "senior_citizen": "3.50%" },
+      { "tenure": "15 days to 30 days",      "general": "3.00%", "senior_citizen": "3.50%" },
+      { "tenure": "31 days to 45 days",      "general": "3.50%", "senior_citizen": "4.00%" },
+      { "tenure": "46 days to 90 days",      "general": "4.50%", "senior_citizen": "5.00%" },
+      { "tenure": "91 days to 179 days",     "general": "5.50%", "senior_citizen": "6.00%" },
+      { "tenure": "180 days to 364 days",    "general": "6.00%", "senior_citizen": "6.50%" },
+      { "tenure": "1 year",                  "general": "6.80%", "senior_citizen": "7.30%" },
+      { "tenure": "1 year 1 day to 2 years", "general": "6.80%", "senior_citizen": "7.30%" },
+      { "tenure": "2 years 1 day to 3 years","general": "6.70%", "senior_citizen": "7.20%" },
+      { "tenure": "3 years 1 day to 5 years","general": "6.50%", "senior_citizen": "7.00%" },
+      { "tenure": "5 years 1 day to 10 years","general": "6.50%", "senior_citizen": "7.00%" }
+    ],
+    "special_tenure": {
+      "333_days": { "general": "7.25%", "senior_citizen": "7.75%", "note": "Union Bank Special FD — Limited period offer" },
+      "456_days": { "general": "7.30%", "senior_citizen": "7.80%", "note": "Union Samriddhi Special FD" }
+    }
+  },
+
+  "deposit_limits": {
+    "minimum": "₹1,000",
+    "maximum": "No upper limit (DICGC insurance covers up to ₹5 Lakh)"
+  },
+
+  "tenure_range": {
+    "minimum": "7 days",
+    "maximum": "10 years"
+  },
+
+  "types_of_fd": [
+    {
+      "name": "Regular Fixed Deposit",
+      "description": "Standard FD, interest paid quarterly or at maturity",
+      "premature_withdrawal": "Allowed with 1% penalty on applicable rate"
+    },
+    {
+      "name": "Tax Saving FD (Section 80C)",
+      "description": "5-year lock-in, up to ₹1.5 Lakh deduction under Section 80C",
+      "premature_withdrawal": "NOT allowed — cannot be broken before 5 years",
+      "max_deposit": "₹1,50,000 per financial year"
+    },
+    {
+      "name": "Union Samriddhi FD",
+      "description": "Special tenure FD — higher interest rate",
+      "premature_withdrawal": "Allowed with penalty"
+    },
+    {
+      "name": "Flexi Fixed Deposit",
+      "description": "Linked to savings account, auto-sweep facility",
+      "premature_withdrawal": "Allowed without penalty for sweep portions"
+    },
+    {
+      "name": "Senior Citizen FD",
+      "description": "For customers aged 60 and above, 0.50% extra interest",
+      "special_benefit": "Also suggest SCSS (Senior Citizen Savings Scheme)"
+    },
+    {
+      "name": "NRE / NRO Fixed Deposit",
+      "description": "For Non-Resident Indians",
+      "tax": "NRE: Tax-free in India | NRO: Taxable"
+    }
+  ],
+
+  "eligibility": {
+    "who_can_open": [
+      "Individual (single / joint)",
+      "HUF (Hindu Undivided Family)",
+      "Company / Trust / Society",
+      "Minor (with guardian)",
+      "NRI (via NRE/NRO account)"
+    ],
+    "documents_needed": {
+      "existing_customer": "If KYC is already updated, no additional documents are needed",
+      "new_customer": ["PAN Card (mandatory for ₹50,000+)", "Aadhaar Card", "Passport size photo", "Address proof"]
+    }
+  },
+
+  "loan_against_fd": {
+    "available": true,
+    "max_loan": "90% of FD amount",
+    "interest_rate": "FD rate + 2% (typically)",
+    "benefit": "No need to break the FD — take a loan and keep the FD intact"
+  },
+
+  "interest_payout_options": [
+    "Monthly (at discounted rate)",
+    "Quarterly",
+    "Half-yearly",
+    "On Maturity (cumulative)"
+  ],
+
+  "auto_renewal": {
+    "available": true,
+    "default": "Auto-renewal occurs at the same tenure upon maturity",
+    "customer_instruction": "Customer can provide advance instructions for maturity disposition"
+  },
+
+  "premature_withdrawal": {
+    "penalty": "1% less than applicable rate for actual tenure",
+    "example": "If a 1-year FD is broken at 6 months — the 6-month rate minus 1% will apply",
+    "tax_saving_fd": "Cannot be broken before 5 years"
+  },
+
+  "tds_rules": {
+    "threshold": "TDS is deducted if interest exceeds ₹40,000 (₹50,000 for senior citizens)",
+    "tds_rate": "10% (with PAN) / 20% (without PAN)",
+    "exemption": "Submit Form 15G (general) / Form 15H (senior citizen) to avoid TDS — if income is below taxable limit"
+  },
+
+  "process_steps": [
+    {
+      "step": 1,
+      "title": "Understand Customer Goal",
+      "detail": "How long do they want to invest? Do they need monthly income or lump sum at maturity? Do they need tax saving?",
+      "time": "3-5 minutes"
+    },
+    {
+      "step": 2,
+      "title": "Suggest Best FD Type",
+      "detail": "Based on the goal — recommend Tax Saving FD, Special FD (333/456 days), or Regular FD",
+      "time": "2-3 minutes"
+    },
+    {
+      "step": 3,
+      "title": "Verify KYC",
+      "detail": "Existing customer = KYC already done. New customer = collect PAN + Aadhaar",
+      "time": "5-10 minutes"
+    },
+    {
+      "step": 4,
+      "title": "Confirm Amount & Tenure",
+      "detail": "Show the maturity amount using the calculator — exact returns",
+      "time": "2 minutes"
+    },
+    {
+      "step": 5,
+      "title": "Open the FD",
+      "detail": "At branch counter / via Net Banking / via Mobile App — suggest the most convenient option to the customer",
+      "time": "5-10 minutes"
+    },
+    {
+      "step": 6,
+      "title": "FD Receipt & Form 15G/H",
+      "detail": "Issue FD receipt. If customer's income is below tax bracket — have them fill Form 15G (under 60) or 15H (senior citizen)",
+      "time": "5 minutes"
+    }
+  ],
+
+  "staff_tips": [
+    "If the customer is a senior citizen, the 0.50% extra rate applies automatically — remind them",
+    "333-day or 456-day special FDs offer the highest rates — suggest these first",
+    "If investing more than ₹5 Lakh, inform about the DICGC insurance limit",
+    "Also mention the loan against FD option — no need to break the FD in an emergency",
+    "Tax saving FD — ensure the customer understands the 5-year lock-in period"
+  ]
+}

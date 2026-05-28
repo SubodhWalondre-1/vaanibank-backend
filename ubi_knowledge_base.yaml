@@ -1,0 +1,407 @@
+# ============================================================
+# Union Bank of India — Official Knowledge Base for RAG
+# Version: 2.5 (May 2026) — Comprehensive Retail, Digital & Overseas Data
+# ============================================================
+
+kyc_standards:
+  mandatory_baseline:
+    - "PAN Card (or Form 60 declaration)"
+    - "Two recent passport-size photographs"
+    - "One Officially Valid Document (OVD) for Identity and Address"
+  proof_of_identity_poi:
+    - "Aadhaar Card"
+    - "Passport"
+    - "Voter ID"
+    - "Driving License"
+    - "NREGA Job Card (must be duly signed by a State Government officer)"
+  proof_of_address_poa:
+    notes: "If POI contains current address, it serves as POA automatically."
+    accepted_documents:
+      utility_bills: "Electricity, landline/postpaid mobile, piped gas, or water bill (max 2 months old)"
+      property_tax: "Property or Municipal Tax receipt"
+      pension_orders: "PPO issued to retired govt/PSU employees (must contain current address)"
+      accommodation_letters: "Allotment letter from Govt, PSU, Scheduled Commercial Bank, or Listed Company"
+
+document_checklists:
+  standard_baseline:
+    - "Duly filled application form"
+    - "KYC documents (POI/POA)"
+    - "Passport-size photographs"
+
+  education_loan:
+    must_have:
+      - "Academic documents (10th/12th/Graduation mark sheets)"
+      - "College admission letter and detailed fee schedule"
+      - "Last 12 months bank statements (Borrower, Co-borrower, Guarantor)"
+      - "Income proof (ITR/Form 16) of co-borrower/guarantor"
+    optional_conditional:
+      - "Caste certificate (only for Govt interest subsidy schemes)"
+    moratorium_repayment:
+      emi_commencement: "1 year after course completion OR 6 months after securing employment, whichever is earlier."
+      moratorium_interest: "Borrowers can pay interest during moratorium to prevent compounding."
+      max_tenure: "15 years (excluding moratorium)."
+      course_extension: "Submit official university letter before original end date for moratorium extension."
+    csis_subsidy:
+      eligibility:
+        - "EWS category (Annual parental income up to ₹4.5 Lakh)"
+        - "Professional/Technical course in approved Indian HEI"
+      notes: "100% full interest subvention. Applicable for DOMESTIC studies only (not abroad)."
+
+  home_loan:
+    must_have:
+      salaried: "Last 2 years ITR/Form 16 + Latest 3 months salary slips"
+      non_salaried: "Last 3 years ITR + Proof of business existence"
+      general:
+        - "Last 6 months bank statements"
+        - "Agreement to Sell or Allotment Letter"
+        - "Property ownership documents (Title deed, original sale deed, or society share certificate)"
+        - "Copy of building plan approved by local municipal body"
+    optional_conditional:
+      - "NOC from Builder/Developer/Housing Society"
+      - "Advance payment or own-contribution receipts"
+      - "Estimated cost of construction/renovation (for construction loans)"
+
+  vehicle_loan:
+    must_have:
+      salaried: "Last 2 years ITR/Form 16 + Latest 3 months salary slips"
+      non_salaried: "Last 2 years ITR"
+      general:
+        - "Last 6 months bank statements"
+        - "Proforma invoice from authorized vehicle dealer"
+        - "Receipt of advance/booking amount already paid"
+    optional_conditional:
+      - "Sanction letter and last 12 months account statement (for loan takeovers)"
+
+  personal_loan:
+    must_have:
+      salaried: "Last 2 years ITR/Form 16 + Latest 3 months salary slips"
+      non_salaried: "Last 2 years ITR"
+      general:
+        - "Office or business address proof"
+        - "Last 12 months bank statements"
+
+education_loan_matrices:
+  pm_vidyalaxmi_scheme:
+    target: "Quality Higher Education Institutions (QHEIs) in India"
+    qhei_definition:
+      - "All HEIs in Top 100 NIRF overall/category/domain rankings"
+      - "All Govt HEIs in Top 101-200 NIRF"
+      - "All Central Govt run institutions"
+    loan_ceiling: "Need-based (no maximum cap)"
+    refusal_policy: "Cannot be refused based on income > ₹8L; income only determines subvention eligibility."
+    collateral_requirement: "NIL (strictly collateral-free and guarantor-free even for loans > ₹7.5 Lakh for QHEIs)"
+    credit_guarantee: "75% coverage up to ₹7.50 Lakh"
+    interest_subvention:
+      income_upto_4.5l: "100% full subvention during course + moratorium"
+      income_4.5l_to_8l: "3% subvention for loans up to ₹10 Lakh"
+      application: "Digital via Vidya Lakshmi Portal (CELAF form)"
+    delivery_mechanism: "Direct credit via CBDC (Central Bank Digital Currency) e-vouchers to loan account"
+
+  premier_institute_abroad:
+    quantum_limits: "Min ₹7.50 Lakh; No upper ceiling for Ivy League/Premier Global (need-based)"
+    unsecured_limits:
+      category_a: "Up to ₹40 Lakh (No collateral/guarantee required, e.g., IITs/IIMs)"
+      category_b: "Up to ₹30 Lakh"
+    collateral_rules:
+      above_unsecured_threshold: "Min 50% tangible collateral security required"
+      rate_incentive: "0.50% concession if collateral >= 100% (even if unsecured-eligible)"
+    margin_rules:
+      standard: "15% on all overseas expenses"
+      with_100pct_collateral: "0% margin (applicable if 100% liquid collateral like UBI FD is provided)"
+    processing_fees:
+      upto_40l: "₹10,000 + GST"
+      above_40l: "1% of loan amount (refundable/adjustable on 1st disbursement)"
+    coverage: "Covers tuition, living expenses (hostel/rent), round-trip airfare, and laptop purchase (per university estimate)."
+
+  domestic_premier_institute:
+    tier_1:
+      institutes: "IITs, IIMs, NITs, ISB, XLRI"
+      max_loan: "₹40 Lakh"
+      margin: "0%"
+      collateral: "NIL"
+      co_applicant_rule: "Parent/guardian mandatory but their income/means NOT considered for core evaluation. Min CIBIL 650/-1 required."
+    tier_2:
+      max_loan: "₹20 Lakh"
+      margin_upto_7.5l: "0%"
+      margin_above_7.5l: "5%"
+    margin_above_40l: "15% (unless 100% tangible collateral provided, then 0%)"
+
+  general_baseline:
+    thresholds:
+      upto_4l:
+        collateral: "Nil"
+        tpg: "Nil"
+        margin_inland: "0%"
+        margin_abroad: "0%"
+      4l_to_7.5l:
+        collateral: "Nil"
+        tpg: "Mandatory (Suitable)"
+        margin_inland: "5%"
+        margin_abroad: "15%"
+      above_7.5l:
+        collateral: "100% Tangible Security"
+        tpg: "Mandatory Co-Applicant"
+        margin_inland: "5%"
+        margin_abroad: "15%"
+    repayment:
+      moratorium: "Course Duration + 12 Months (1 Year)"
+      max_tenure: "15 Years after moratorium"
+
+savings_account_rules:
+  qab_tiering:
+    notes: "QAB (Quarterly Average Balance) is calculated as the sum of EOD closing balances divided by total days in the quarter."
+    calculation_formula: "QAB = Σ(Daily EOD Closing Balances) / Total Days in Quarter"
+    guardrail_example: "If a metro user with a ₹1,000 target has ₹0 for 80 days of a 90-day quarter, they can avoid penalties by maintaining ₹9,000 for the final 10 days."
+    with_cheque_book:
+      rural: "₹250"
+      semi_urban: "₹500"
+      urban: "₹1,000"
+      metro: "₹1,000"
+    without_cheque_book:
+      rural: "₹100"
+      semi_urban: "₹250"
+      urban: "₹500"
+      metro: "₹500"
+  shortfall_penalties:
+    structure:
+      - range: "₹750 to ₹999 (Shortfall up to ₹250)"
+        flat_rate: "₹25"
+        total_with_gst: "₹29.50"
+      - range: "₹500 to ₹749 (Shortfall ₹251 to ₹500)"
+        flat_rate: "₹50"
+        total_with_gst: "₹59.00"
+      - range: "Below ₹500 (Shortfall ₹501 to ₹1,000)"
+        flat_rate: "₹100"
+        total_with_gst: "₹118.00"
+    exemptions:
+      pensioners: "Completely exempt. AQB requirement relaxed to ₹25 (with chequebook) or ₹20 (without chequebook). Penalty is NIL."
+      standard_senior_citizens: "Must maintain baseline AQB unless account is mapped to Pensioner variant or zero-balance digital variant."
+  account_status:
+    dormancy: "Inoperative after 2 years of zero customer-induced transactions"
+    reactivation_process:
+      location: "Must visit any physical branch (Home or Non-base)"
+      artifacts:
+        - "Signed Request for Activation form"
+        - "Fresh self-attested OVD copies"
+        - "Recent passport-size color photo"
+      verification: "Original OVDs must be presented at counter for physical/biometric verification"
+    online_reactivation_rule: "Blocked. Digital Re-KYC/Video-KYC is only for active accounts. Inoperative accounts require physical risk-clearance."
+    transaction_classification:
+      non_customer_induced: "Quarterly interest credit, automated service fee debits (do NOT reset timer)"
+      customer_induced: "UPI, ATM, cash deposit, mobile login, clearing physical cheque (RESETS timer)"
+    reactivation_fee: "NIL (strictly prohibited per RBI directives)"
+    rag_note: "Auto-interest and service fees do NOT count as customer activity. Reactivation requires fresh KYC at home branch."
+  bsbda_and_small_accounts:
+    standard_bsbda:
+      kyc: "Full KYC mapped"
+      balance_cap: "No maximum cap"
+      annual_credit: "Unlimited"
+      chequebook: "25 free leaves per year"
+    small_account:
+      kyc: "Relaxed/Simplified KYC (Self-attested photo + declaration)"
+      balance_cap: "₹50,000 at any point"
+      annual_credit: "₹1,00,000 total credit footings per fiscal year"
+      monthly_withdrawal_cap: "₹10,000 aggregate"
+      chequebook: "Barred (Not provided)"
+      block_rule: "Automatically frozen if balance > ₹50k or annual credit > ₹1L. Requires formal KYC to normalize."
+    withdrawal_rules:
+      free_limit: "4 free withdrawals per calendar month"
+      channel_coverage: "Aggregated across all channels (Branch, ATM, AEPS, Digital IMPS/NEFT/RTGS)"
+      deposits: "Always free and infinite"
+    upgradation: "Submit 'Account Status Upgradation Request' with Aadhaar (e-KYC) and PAN Card at base branch."
+
+digital_banking:
+  rebranding:
+    old_name: "VYOM"
+    new_name: "Union ease"
+    note: "All RAG prompts must resolve to 'Union ease'"
+  daily_transaction_limits:
+    union_ease_imps: "₹5,00,000"
+    union_ease_neft: "₹10,00,000"
+    retail_upi: "₹1,00,000 (Max 20 transactions per day)"
+    new_beneficiary_cooling: "₹50,000 total for first 24 hours"
+    sms_banking: "₹5,000"
+    atm_withdrawal_classic: "₹25,000"
+    atm_withdrawal_hni_emperio: "₹1,00,000"
+    pos_merchant_classic: "₹50,000"
+    pos_merchant_hni_emperio: "₹5,00,000 (Includes international POS)"
+    bhim_aadhaar_pay: "₹10,000"
+  troubleshooting:
+    device_binding_error: "SIM Slot 1 required, active SMS balance needed. Use 'Re-register/Reset Device' if SIM changes."
+    tpin_generation: "In-app Settings > Reset tPIN > Debit Card Auth. Instant generation."
+    locked_net_banking: "Use 'Self-User Unlocking' online. Requires User ID, Account Number, OTP, and Debit Card PIN."
+    npcilimit_exceeded: "Triggers at 20 transactions/day or ₹1 Lakh UPI limit."
+  self_service_actions:
+    stop_payment: "Internet Banking > General Services > Cheque Book Facility > Stop Payment."
+    aadhaar_linking: "Use BASE (Bharat Aadhaar Seeding Enabler) portal online."
+    self_user_creation_no_card: "Use 'Self User Creation' > 'View Only Facility' with PAN/DOB."
+    card_blocking_ivr: "1800-22-2244 / 1800-208-2244. Voice command: 'Card Blocking'."
+    card_channel_management: "In-app Cards > Debit Card Services > Manage Card Channels (Toggle International/E-commerce)."
+
+grievance_redressal:
+  escalation_matrix:
+    level_1: "Branch Manager / Online CCU"
+    level_2: "Regional Grievance Redressal Officer (R-GRO)"
+    level_3: "Principal Nodal Officer (PNO), Mumbai (pno@unionbankofindia.bank.in)"
+    level_4: "RBI Banking Ombudsman"
+  tat:
+    digital_transactions: "5 to 7 working days for initial reversal"
+    max_internal_resolution: "30 Days"
+    ombudsman_rule: "Escalate only if no reply within 30 days or unsatisfactory resolution"
+
+interest_rates:
+  loan_products:
+    home_loan:
+      range: "7.15% to 9.60% p.a."
+      lowest_rate_logic: "7.15% (EBLR 8.00% - 0.85% CIBIL discount for 800+ score)"
+      concession: "0.05% for female sole/primary owners"
+      notes: "Varies based on CIBIL score and loan amount"
+    education_loan:
+      range: "6.95% to 8.85% p.a."
+    vehicle_loan_new:
+      range: "7.40% to 7.50% p.a."
+    vehicle_loan_used:
+      range: "10.40% to 10.50% p.a."
+    personal_loan:
+      range: "Starts at 8.75% p.a."
+      concessions: "NIL processing fees for women professionals (UWPPL) and Pensioners (UBI account holders)"
+
+  deposit_products:
+    fixed_deposits:
+      general: "2.75% to 6.30% (peak at 400 days)"
+      senior_citizen: "Additional 0.50% (peak 6.80%)"
+    savings_account:
+      standard: "2.75% up to ₹50 Lakh"
+      high_value: "Up to 3.55% for balances above ₹1,000 Crore"
+
+eligibility:
+  home_loan:
+    age_limit: "21 to 65 years"
+    min_income_salaried: "₹10,000 per month"
+    min_income_self_employed: "₹2 Lakh per annum"
+    employment: "Salaried, self-employed, professionals, non-salaried with steady income"
+    ltv_ratios:
+      upto_30l: "Up to 90%"
+      30l_to_75l: "Up to 80%"
+      above_75l: "Up to 75%"
+  education_loan:
+    nationality: "Indian National"
+    admission: "Secured admission to recognized higher education/professional course (India/Abroad) via merit selection"
+    co_applicant: "Mandatory (parent/spouse/guardian). CIBIL 650+ preferred for premium institutes."
+  vehicle_loan_union_miles:
+    used_car_rules:
+      max_age_at_end_of_tenure: "7 years from manufacturing date"
+      max_age_at_application: "3 years"
+    nri_eligibility: "Can be primary borrower if local Indian resident is co-borrower."
+    employment: "Salaried, non-salaried, professionals, NRIs"
+    tenure_max: "7 years (84 months) for new four-wheelers"
+    margins:
+      new_car: "15%"
+      used_car: "30% to 40% based on valuation"
+  personal_loan:
+    min_salary_metro: "₹20,000 net take-home per month"
+    min_salary_non_metro: "₹15,000 gross per month"
+    non_salaried_requirement: "Maintain UBI account for 2 years with healthy balance track record + ITR filing."
+    women_professionals: "Relaxed income criteria and interest discount under UWPPL."
+    default_penalty: "2% p.a. over base rate on overdue amount."
+
+service_charges:
+  processing_fees:
+    home_loan: "0.50% of loan amount (max ₹15,000 + GST)"
+    vehicle_loan_2w: "Flat ₹500 + GST"
+    vehicle_loan_4w: "Flat ₹1,000 + GST"
+    personal_loan: "1.00% (min ₹500, max ₹7,500). Pensioners: NIL (if UBI account holder)."
+    education_loan: "NIL up to ₹4 Lakh. Above ₹40 Lakh (Abroad): 1% (refundable on disbursement)."
+  margin_money:
+    home_loan: "10% to 25% based on LTV"
+    vehicle_loan_new: "15% (Salaried UBI holders get 5% concession)"
+    vehicle_loan_used: "40%"
+    education_loan: "NIL up to ₹4 Lakh. Above ₹4 Lakh: 5% (India), 15% (Abroad)."
+
+penalties:
+  pre_payment:
+    floating_rate: "No pre-payment penalty for standard retail loans"
+    fixed_rate: "2% flat penalty if closed before maturity (beyond 36 months)"
+  late_payment:
+    late_penalty: "2% p.a. over standard rate on overdue amount"
+  loan_tracking:
+    online_portal: "Track Application Status via official portal using Web Reference Number + Mobile."
+  loan_closures:
+    property_deed_return: "15 to 30 days post foreclosure/closure paperwork validation."
+    lap_security_docs: "Original Title Deeds, 30-year Chain Docs, Approved Plan, EC, and Tax receipts."
+  tax_documents:
+    interest_certificate: "Download via Net Banking (Loans > Interest Certificate) or Union ease (Tax Documents)."
+  fraud_safeguards:
+    reporting_phishing: "Email suspicious links to phishing@unionbankofindia.bank"
+    cyber_fraud_helpline: "1930 (National Cyber Crime Helpline)"
+    emergency_freeze: "Send 'BLOCK' to 09223008486 or use 'Panic Freeze' in Union ease app."
+  grievance_redressal_extra:
+    atm_failed_reversal: "T+5 working days (RBI mandate)."
+    level_2_escalation: "Contact Regional Nodal Officer (RNO) via corporate website directory."
+    pno_email: "pno@unionbankofindia.bank"
+    ombudsman_wait: "Allow bank 30 days to respond before escalating to RBI Ombudsman."
+  cards_extra:
+    classic_atm_limit: "₹25,000"
+    hni_emperio_limits:
+      atm: "₹1,00,000"
+      pos: "₹5,00,000"
+      perks: "Complimentary airport lounge access."
+    green_pin_generation: "ATM > Set/Generate Green PIN > Generate OTP > Validate OTP > Type PIN."
+
+general_account_services:
+  nomination:
+    physical: "Submit Form DA-1 (Add) or DA-2 (Change/Cancel) at home branch. Signatures of all holders required."
+    digital: "Union ease app / Net Banking > General Services > Service Requests > Add/Modify Nomination. Validate via tPIN/OTP."
+    minor_nominee: "Guardian appointment mandatory within the same form."
+  passbook_services:
+    standard_update: "NIL (Free) at branch counter or Swayam Kiosk."
+    duplicate_issuance: "₹100 + 18% GST (Total ₹118). Rural accounts: ₹50 + GST."
+  account_transfer:
+    process: "Submit physical application at current or destination branch. No account number change."
+    digital: "Internet Banking > General Services > Service Requests > Transfer of Account. TAT: 2-3 working days."
+  cash_deposit_limits:
+    pan_threshold: "₹50,000 per day (Rule 114B of IT Rules). Form 60 if no PAN."
+    annual_reporting: "Aggregate deposits > ₹10 Lakh reported via SFT to IT Dept."
+  email_updates:
+    union_ease: "Profile > Update Email ID > OTP confirmation."
+    sms_activation: "SETM <Account Number> <Email ID> to 09223008486."
+    e_statements: "Monthly PDF delivery. Password: Customer ID + Date of Birth."
+
+fixed_recurring_deposits:
+  interest_tiers:
+    peak_rate: "6.30% p.a. (Retail domestic < ₹3 Crore)"
+    milestone_tenure: "400 Days"
+    senior_citizen_premium: "+0.50% p.a. (Total 6.80% for 400 days)"
+    super_senior_premium: "+0.75% p.a. (Total 7.05% for 400 days - Age 80+)"
+  dric_cumulative_scheme:
+    min_amount: "₹1,000 (Multiples of ₹100 thereafter)"
+    mechanism: "Quarterly compounding. Reinvested into principal. Lump sum payout at maturity."
+  tax_saver_scheme:
+    tenure_lock_in: "Strictly 5 years (Max 10 years). No premature closure allowed."
+    deduction_limit: "Up to ₹1.5 Lakh under Section 80C per fiscal year."
+  recurring_deposits:
+    calculation_formula: "A = P * [((1 + r/n)^(nt) - 1) / (1 - (1 + r/n)^(-1/3))]"
+    notes: "n = 4 (Quarterly compounding per RBI guidelines)."
+  pre_closure_rules:
+    penalty_rate: "1.00% deduction from applicable interest rate."
+    calculation: "Lower of (Rate on booking for completed tenure OR Original booked rate) - 1.00%"
+    grace_period: "No interest and no penalty if closed within 7 days."
+  partial_withdrawal:
+    scheme: "Union Money Flex Deposit"
+    mechanism: "Modular units of ₹1,000 can be withdrawn via ATM/Net Banking. Remaining units earn original rate."
+  auto_renewal:
+    default_action: "Automatic rollover for identical tenure unless 'Do Not Renew' is mapped."
+    rate: "Prevailing rate on the renewal date."
+  tds_management:
+    trigger_threshold: "Annual interest > ₹40,000 (General) / ₹50,000 (Senior Citizens) per Section 194A."
+    avoidance: "Submit Form 15G (General) or Form 15H (Senior Citizens) at start of fiscal year."
+    submission_routes: "Digital (Union ease > Tax Corner) or Physical (2 signed copies at branch)."
+  monthly_income_scheme:
+    mechanism: "Discounted value basis (not simple interest). Payout is slightly lower to keep yield equivalent to FD rate."
+    payout: "Automated monthly credit to linked savings/current account."
+  loan_against_fd:
+    max_limit: "Up to 90% of principal + accrued interest."
+    interest_rate: "1% to 2% above the FD rate. Charged only on the utilized amount."
+  nri_services:
+    online_fd: "Active NRE/NRO savings holders can open FDs via Net Banking or Union ease (Vyom) app without branch visit."
+  rd_payout_restriction: "RD is strictly cumulative. No monthly payouts allowed. For monthly income, switch to MIS Fixed Deposit."

@@ -1,0 +1,60 @@
+# VaaniBank AI — Backend Dependencies
+# PSBs Hackathon 2026 | Team Vectora
+
+# Web Framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# Database
+sqlalchemy==2.0.30
+alembic==1.13.1
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+
+# Data Validation
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.3
+
+# HTTP & Multipart
+httpx==0.27.0
+python-multipart==0.0.9
+
+# WebSockets
+websockets==12.0
+
+# Cache
+redis==5.0.4
+
+# AI / STT
+groq==0.9.0
+google-generativeai>=0.8.0
+
+# PDF Generation
+reportlab==4.2.0
+fpdf2==2.7.9
+
+# QR Code
+qrcode[pil]==7.4.2
+pillow>=10.3.0
+
+# Environment
+python-dotenv==1.0.1
+
+# Utilities
+python-dateutil==2.9.0
+aiofiles==23.2.1
+PyYAML==6.0.1
+boto3==1.34.115
+
+# RAG — Retrieval-Augmented Generation
+# Provides grounded banking knowledge retrieval over the local knowledge base.
+# chromadb: local persistent vector store (no external API, zero cost)
+# rank-bm25: BM25 keyword search for exact banking term matching (CIBIL, PMJDY etc.)
+chromadb==0.5.3
+rank-bm25==0.2.2
+

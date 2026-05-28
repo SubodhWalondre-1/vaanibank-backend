@@ -1,0 +1,43 @@
+{
+  "intent": "CIBIL_INFO",
+  "product_name": "CIBIL Score — Guide for Union Bank Staff",
+  "last_updated": "2024-01",
+
+  "score_ranges": [
+    { "range": "750 - 900", "status": "Excellent",  "loan_impact": "Best rates, fast approval, higher loan amounts" },
+    { "range": "700 - 749", "status": "Good",        "loan_impact": "Approval likely, standard rates" },
+    { "range": "650 - 699", "status": "Fair",        "loan_impact": "Higher rate, may need collateral/guarantor" },
+    { "range": "550 - 649", "status": "Poor",        "loan_impact": "Application likely rejected at most banks" },
+    { "range": "-1 / 0",    "status": "No history",  "loan_impact": "First-time borrower — need to build credit" }
+  ],
+
+  "what_affects_score": [
+    { "factor": "Payment history",        "weightage": "35%", "detail": "Whether EMIs and credit card bills are being paid on time" },
+    { "factor": "Credit utilization",     "weightage": "30%", "detail": "Percentage of credit card limit being used — keep it below 30%" },
+    { "factor": "Credit age",             "weightage": "15%", "detail": "Older accounts are better — longer history is advantageous" },
+    { "factor": "Credit mix",             "weightage": "10%", "detail": "A mix of secured + unsecured loans is considered positive" },
+    { "factor": "New credit inquiries",   "weightage": "10%", "detail": "Applying for loans at multiple places simultaneously can lower the score" }
+  ],
+
+  "improvement_tips": [
+    "Pay all EMIs and credit card bills before the due date — impact shows within 1 month",
+    "Keep credit card outstanding below 30% of the total limit",
+    "Do not close old credit card accounts — it reduces credit history length",
+    "Avoid multiple loan applications simultaneously — each inquiry lowers the score",
+    "Consistent good behavior for 6-12 months can improve the score by 50-100 points",
+    "Taking a secured loan (gold loan / loan against FD) helps start credit history (for those with no history)"
+  ],
+
+  "how_to_check": [
+    { "method": "CIBIL Official Website", "url": "https://www.cibil.com", "cost": "1 free check/year, ₹550 for detailed report" },
+    { "method": "Union Bank Mobile App",  "detail": "CIBIL check facility available in Union Mobile app" },
+    { "method": "Paisabazaar / BankBazaar", "detail": "Free unlimited checks (soft inquiry — no impact on score)" }
+  ],
+
+  "soft_vs_hard_inquiry": {
+    "soft": "When a customer checks their own score — no impact on score",
+    "hard": "When a bank pulls CIBIL for a loan application — score drops slightly temporarily"
+  },
+
+  "staff_note": "Written or digital consent from the customer is mandatory before pulling their CIBIL report — RBI guidelines"
+}

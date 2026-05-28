@@ -1,0 +1,202 @@
+{
+  "intent": "EDUCATION_LOAN",
+  "product_name": "Union Bank of India Education Loan",
+  "tagline": "Union Education — India Studies, India Grows",
+  "last_updated": "2024-01",
+
+  "schemes": [
+    {
+      "scheme_name": "Union Student — Domestic",
+      "for": "Studies within India",
+      "max_loan": "₹20 Lakh",
+      "collateral": "Up to ₹7.5 Lakh — no collateral. Above ₹7.5L — collateral/guarantee required"
+    },
+    {
+      "scheme_name": "Union Student — Abroad",
+      "for": "Studies abroad",
+      "max_loan": "₹1.5 Crore (premier institutes), ₹40 Lakh (general)",
+      "collateral": "Up to ₹7.5 Lakh — no collateral. Above ₹7.5L — property/collateral required"
+    },
+    {
+      "scheme_name": "Vidya Lakshmi Portal Loan",
+      "for": "Apply via Govt portal — single application to multiple banks",
+      "portal": "https://www.vidyalakshmi.co.in",
+      "benefit": "Single application, multiple bank options"
+    },
+    {
+      "scheme_name": "PM Vidyalaxmi Scheme (2024)",
+      "for": "Students at Top 100 NIRF ranked institutes",
+      "benefit": "3% interest subvention during moratorium",
+      "income_limit": "Family income up to ₹8 Lakh"
+    }
+  ],
+
+  "interest_rates": {
+    "domestic": {
+      "upto_7_5_lakh":  "10.50% p.a.",
+      "above_7_5_lakh": "10.75% p.a."
+    },
+    "abroad": {
+      "upto_7_5_lakh":  "10.50% p.a.",
+      "above_7_5_lakh": "10.75% p.a."
+    },
+    "concessions": [
+      { "category": "Girl student", "concession": "0.50% less" },
+      { "category": "Simple interest during moratorium (if paid timely)", "concession": "1% concession after repayment starts" },
+      { "category": "IIT/IIM/NIT/Premier Institutes", "concession": "Special rates applicable" }
+    ]
+  },
+
+  "expenses_covered": [
+    "College/University tuition fee",
+    "Hostel/accommodation charges",
+    "Examination, library, laboratory fees",
+    "Books, equipment, instruments, uniforms",
+    "Computer/laptop (if required for course)",
+    "Travel expenses for abroad studies",
+    "Caution deposit / building fund (reasonable amount)",
+    "Health insurance premium for student"
+  ],
+
+  "eligible_courses": {
+    "domestic": [
+      "Graduation / Post-graduation (Arts, Science, Commerce, Engineering, Medical, Law, MBA)",
+      "IIT, IIM, NIT, IISc, AIIMS",
+      "CA, ICWA, CS professional courses",
+      "Polytechnic diploma courses",
+      "Nursing, Pharmacy, BPT",
+      "Govt approved vocational/technical courses"
+    ],
+    "abroad": [
+      "Job-oriented professional courses (MS, MBA, MCA)",
+      "Regular degree programs at reputed universities",
+      "CIMA, CPA, CFA — professional certifications",
+      "Aviation, Shipping (merchant navy)"
+    ]
+  },
+
+  "eligibility": {
+    "student": {
+      "nationality": "Indian citizen",
+      "admission": "Confirmed admission proof compulsory (offer letter / admission letter)",
+      "academic": "Good academic record preferred"
+    },
+    "co_applicant": "Parent / Guardian / Spouse / Sibling — mandatory as co-borrower"
+  },
+
+  "collateral_rules": {
+    "upto_4_lakh":         "No collateral, no margin. Parent/Guardian as co-borrower",
+    "4_lakh_to_7_5_lakh":  "No collateral. Third party guarantee OR parent as co-borrower",
+    "above_7_5_lakh":      "Tangible collateral — property, NSC, LIC policy, FD etc."
+  },
+
+  "margin_money": {
+    "domestic_upto_4_lakh": "NIL",
+    "domestic_above_4_lakh": "5% of loan amount",
+    "abroad": "15% of loan amount"
+  },
+
+  "moratorium_period": {
+    "definition": "Course duration + 1 year (or 6 months after getting a job — whichever is earlier)",
+    "during_moratorium": "Interest payment is optional (simple interest) — if paid, a 1% concession is given",
+    "example": "4-year BTech + 1 year = 5-year moratorium"
+  },
+
+  "repayment": {
+    "tenure": "15 years (after moratorium)",
+    "emi_start": "EMI starts after the moratorium period ends"
+  },
+
+  "processing_fee": {
+    "domestic": "NIL",
+    "abroad":   "₹5,000 (refundable if loan not sanctioned)"
+  },
+
+  "subsidy_schemes": [
+    {
+      "name": "Central Sector Interest Subsidy (CSIS)",
+      "for": "EWS students — family income below ₹4.5 Lakh",
+      "benefit": "Full interest during moratorium period is paid by the government",
+      "course": "Professional/technical courses at approved institutes"
+    },
+    {
+      "name": "Padho Pardesh",
+      "for": "Minority community students — abroad studies",
+      "benefit": "Moratorium period interest subsidy"
+    }
+  ],
+
+  "documents_required": {
+    "student": [
+      "Admission letter / offer letter from institute",
+      "Marksheets — 10th, 12th, graduation (if PG loan)",
+      "Fee structure from institute",
+      "Aadhaar Card + PAN Card",
+      "Passport (mandatory for abroad studies)"
+    ],
+    "co_applicant_parent": [
+      "PAN Card + Aadhaar Card",
+      "Income proof (salary slips / ITR)",
+      "Bank statement last 6 months",
+      "Address proof"
+    ],
+    "collateral_docs": [
+      "Property papers (if collateral is property)",
+      "FD receipt (if FD as collateral)",
+      "LIC policy document"
+    ]
+  },
+
+  "process_steps": [
+    {
+      "step": 1,
+      "title": "Course & Institute Verification",
+      "step_text_hindi": "प्रवेश पत्र देखें और जाँचें कि संस्था बैंक की अनुमोदित सूची में शामिल है या नहीं।",
+      "detail": "Check admission letter and verify if the institute is on the bank's approved list",
+      "time": "5 minutes"
+    },
+    {
+      "step": 2,
+      "title": "Loan Amount Calculation",
+      "step_text_hindi": "शुल्क ढांचा और खर्चे जोड़कर कुल ऋण राशि तय करें। ग्राहक कितना मार्जिन मनी देगा।",
+      "detail": "Fee structure + expenses = total loan. How much margin money will the student contribute?",
+      "time": "10 minutes"
+    },
+    {
+      "step": 3,
+      "title": "Collateral Decision",
+      "step_text_hindi": "₹7.5 लाख से अधिक ऋण के लिए संपार्श्विक आवश्यक है। संपत्ति के कागजात तैयार रखें।",
+      "detail": "If loan exceeds ₹7.5 Lakh, confirm collateral availability.",
+      "time": "Varies"
+    },
+    {
+      "step": 4,
+      "title": "Document Collection",
+      "step_text_hindi": "छात्र और सह-आवेदक सभी आवश्यक दस्तावेज़ एकत्र करें।",
+      "detail": "Collect all required documents from student and co-applicant",
+      "time": "Depends on customer"
+    },
+    {
+      "step": 5,
+      "title": "Application & Sanction",
+      "step_text_hindi": "आवेदन जमा करें, सत्यापन के बाद स्वीकृति पत्र जारी होगा।",
+      "detail": "Submit application, sanction letter issued after verification",
+      "time": "7-15 working days"
+    },
+    {
+      "step": 6,
+      "title": "Loan Disbursement",
+      "step_text_hindi": "शुल्क सीधे संस्था के खाते में और अन्य खर्चे छात्र के खाते में जमा किए जाएंगे।",
+      "detail": "Fee credited directly to institute's account, other expenses to student's account",
+      "time": "Per semester / as needed"
+    }
+  ],
+
+  "staff_tips": [
+    "First check the admission letter — loan cannot be sanctioned without confirmed admission",
+    "PM Vidyalaxmi scheme 2024 is new — 3% subvention for Top 100 NIRF institutes",
+    "If the student is female, mention the 0.50% rate concession",
+    "Paying interest during moratorium gives a 1% extra concession — explain this to the customer",
+    "For abroad studies, ensure the passport is valid — advise early application"
+  ]
+}

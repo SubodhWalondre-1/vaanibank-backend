@@ -1,0 +1,201 @@
+# ============================================================================
+# VaaniBank AI — Intent Guidance Configuration
+# PSBs Hackathon 2026 | Team Vectora
+#
+# Externalized from ai_service.py (P3 #14).
+# Each intent key maps to a multi-line guidance block that is injected into
+# the Groq system prompt when that intent is pre-detected from keywords.
+#
+# To add a new intent (e.g., insurance, locker), simply add a new top-level
+# key here — no code changes required.
+# ============================================================================
+
+account_opening: |
+  === INTENT: ACCOUNT OPENING ===
+
+  --- STAGE 1: EDUCATE (when customer is exploring / asking questions) ---
+  Share this info naturally when customer asks about opening accounts:
+
+  ACCOUNT TYPES AT UNION BANK:
+    • Savings Account: For individuals, ₹1000 min balance (Urban), ₹500 (Rural)
+    • Current Account: For businesses, higher transaction limits
+    • PMJDY / Jan Dhan Account: Zero balance, free RuPay card, ₹2 lakh accident insurance
+    • BSBD (Basic Savings Bank Deposit): Zero balance for anyone, basic features
+    • Salary Account: Through employer tie-up, zero balance
+
+  KEY BENEFITS:
+    • Free RuPay debit card with savings account
+    • Internet banking + UNI Mobile app access
+    • Auto-sweep FD facility available
+    • Nomination facility included
+    • Free NEFT/RTGS via internet banking
+
+  When exploring, end with: "Aapko kaunsa account kholna hai? Main details bata deta hoon."
+
+  --- STAGE 2: COLLECT (when customer wants to proceed) ---
+  1. Ask: Savings ya Current account chahiye?
+  2. Required docs: Aadhaar (original + photocopy), PAN card, 2 passport photos, address proof
+  3. Minimum balance: Urban ₹1000, Semi-Urban ₹500, Rural ₹500, BSBD (zero balance)
+  4. Ask: Kya customer PMJDY / Jan Dhan account banana chahta hai? (zero balance + RuPay card)
+  5. Form number: AOF (Account Opening Form) — staff fills with customer
+  6. Process time: Same day if docs complete
+  Suggested opener: 'जी बिल्कुल, खाता खोलने के लिए Aadhaar और PAN card लाना होगा।'
+
+loan_enquiry: |
+  === INTENT: LOAN ENQUIRY ===
+
+  --- STAGE 1: EDUCATE (when customer is exploring / asking about loans) ---
+  Share this info naturally when customer asks about loans:
+
+  PERSONAL LOAN:
+    • Amount: ₹50,000 to ₹15 lakh
+    • Tenure: 12 to 60 months
+    • Interest: Starts at 8.75% p.a.
+    • No collateral needed
+    • Eligibility: Salaried/Self-employed, CIBIL >= 700, age 21-58
+
+  HOME LOAN:
+    • Amount: Up to 90% of property value (for loans up to ₹30L)
+    • Tenure: Up to 30 years
+    • Interest: 7.15% to 9.60% p.a.
+    • Lowest Rate: 7.15% (for CIBIL 800+)
+    • Concession: 0.05% for female owners
+    • Collateral: Property itself
+
+  EDUCATION LOAN:
+    • India: Up to ₹10 lakh (no collateral up to ₹7.5 lakh)
+    • Abroad: Up to ₹20 lakh
+    • Moratorium: Course duration + 1 year grace period
+    • Interest: 6.95% to 8.85% p.a.
+    • Interest subsidy for economically weaker sections (EWS)
+
+  VEHICLE LOAN:
+    • Up to 85% of on-road price
+    • Tenure: Up to 7 years
+    • Interest: 7.40% to 7.50% (New), 10.40% to 10.50% (Used)
+    • Quick processing: 3-5 working days
+
+  MUDRA LOAN (for small business):
+    • Shishu: Up to ₹50,000
+    • Kishore: ₹50,001 to ₹5 lakh
+    • Tarun: ₹5 lakh to ₹10 lakh
+    • No collateral, no guarantor required
+
+  GOLD LOAN:
+    • Up to 75% of gold value
+    • Quick disbursal: Same day
+    • Tenure: Up to 12 months
+
+  When exploring, end with: "Kaunsa loan aapko interest karta hai? Ya apply karna chahenge?"
+
+  --- STAGE 2: COLLECT (when customer wants to apply) ---
+  1. First ask: Kaunsa loan chahiye? (Home / Personal / Education / Vehicle / Gold / Mudra)
+  2. HOME LOAN: Max 80% property value, tenure 30 years, CIBIL >= 700, processing fee 0.50%
+  3. PERSONAL LOAN: Max ₹15 lakh, 12-60 months, no collateral, CIBIL >= 700
+  4. EDUCATION LOAN: Upto ₹20 lakh (abroad), ₹10 lakh (India), moratorium = course duration + 1 year
+  5. VEHICLE LOAN: 85% of on-road price, tenure 7 years
+  6. MUDRA LOAN: Shishu ₹0-50K, Kishore ₹50K-5L, Tarun ₹5L-10L — no collateral
+  7. Always ask: Monthly income kitni hai? Existing EMIs hain kya?
+  Suggested opener: 'जी, loan के लिए पहले eligibility check करते हैं। आपकी monthly income कितनी है?'
+
+kyc_update: |
+  === INTENT: KYC UPDATE ===
+
+  --- STAGE 1: EDUCATE (when customer is asking about KYC) ---
+  KYC TYPES:
+    • Address Change: Form 11A + new address proof, 2-3 working days
+    • Mobile Update: OTP-based portal or written request, same day
+    • Aadhaar Seeding: Mandatory for DBT/subsidy, link at branch or online
+    • PAN Linking: Required for transactions above ₹50,000
+    • Nominee Update: Can be done at branch with form
+    • Re-KYC: Required every 2 years for high-risk customers (RBI mandate)
+
+  --- STAGE 2: COLLECT (when customer wants to proceed) ---
+  1. Identify what needs updating: Address / Mobile number / Aadhaar seeding / PAN linking / Nominee
+  2. ADDRESS CHANGE: Form 11A + new address proof (utility bill/Aadhaar) + self-attested photocopy
+  3. MOBILE UPDATE: Bank's own OTP-based portal OR written request with Aadhaar
+  4. AADHAAR SEEDING: Mandatory for DBT / subsidy accounts — link via branch or online banking
+  5. RBI rule: KYC re-verification every 2 years for high-risk customers
+  6. Process time: 2-3 working days for address; mobile — same day
+  Suggested opener: 'जी, KYC update के लिए Aadhaar की original copy और एक self-attested photocopy लाइए।'
+
+card_services: |
+  === INTENT: CARD SERVICES ===
+
+  --- STAGE 1: EDUCATE (when customer is asking about cards) ---
+  CARD OPTIONS:
+    • RuPay Classic Debit: Free with savings account, domestic use
+    • VISA/Mastercard Debit: ₹200 charge, international use, delivered in 7 days
+    • Instant Issuance: RuPay card printed at branch (select branches)
+    • Credit Card: CIBIL >= 700, income >= ₹2 lakh/year
+
+  SELF-SERVICE OPTIONS:
+    • Card Block: Call 1800-22-2244 (toll free) or UNI Mobile app
+    • PIN Reset: Any UBI ATM or Green PIN via registered mobile
+    • Card Upgrade: Visit branch with request letter
+
+  --- STAGE 2: COLLECT (when customer wants to proceed) ---
+  1. NEW DEBIT CARD: Instant RuPay Classic free; VISA/Mastercard — ₹200 charge; delivered in 7 days OR instant issuance at branch
+  2. CARD BLOCK: Immediately call 1800-22-2244 (UBI toll free) OR block via UNI Mobile app
+  3. PIN RESET: ATM pin change at any UBI ATM; Green PIN via registered mobile
+  4. CREDIT CARD: Refer to credit card division — CIBIL >= 700, income >= ₹2 lakh/year
+  5. DISPUTE/CHARGEBACK: Written complaint + transaction details; 7-10 working days resolution
+  Suggested opener: 'जी, card block करने के लिए अभी 1800-22-2244 पर call करें या मैं branch से block कर देता हूँ।'
+
+balance_enquiry: |
+  === INTENT: BALANCE ENQUIRY / STATEMENT ===
+
+  --- STAGE 1: EDUCATE (when customer is asking about balance options) ---
+  BALANCE CHECK OPTIONS:
+    • At Branch: Verbally after identity verification (DOB + account number or OTP)
+    • Missed Call: 09223008586 from registered mobile — free
+    • UNI Mobile App: Register with debit card + registered mobile
+    • Internet Banking: Login at unionbankofindia.co.in
+    • Passbook: Update at branch passbook printer — free
+    • SMS Banking: Send BAL to 09223008586
+
+  STATEMENT OPTIONS:
+    • Mini Statement: Free at branch or via missed call
+    • 1 month statement: Free
+    • Older statements: ₹100/year
+    • Email statement: Free via internet banking
+
+  --- STAGE 2: COLLECT (when customer wants balance now) ---
+  1. BALANCE: Give verbally after identity verification (DOB + account number or registered mobile OTP)
+  2. MINI STATEMENT: Passbook update at branch passbook printer — free
+  3. ACCOUNT STATEMENT: 1 month free; older — ₹100/year; email statement free via internet banking
+  4. For UNI Mobile app: Help customer register if not done — requires registered mobile + Debit card
+  5. Missed call balance: 09223008586 (give to customer to note down)
+  Suggested opener: 'जी, balance बताता हूँ — आपका account number और registered mobile number बताइए।'
+
+fixed_deposit: |
+  === INTENT: FIXED DEPOSIT / RD ===
+
+  --- STAGE 1: EDUCATE (when customer is asking about FD/RD) ---
+  FIXED DEPOSIT:
+    • Minimum: ₹1,000, maximum tenure: 10 years
+    • Interest Rates: 2.75% to 6.30% (peak at 400 days)
+    • Senior Citizen: Additional 0.50% (peak 6.80%)
+    • Super Senior (80+): Additional 0.75% (peak 7.05%)
+    • Tax Saving FD: 5 year lock-in, eligible for Section 80C deduction (up to ₹1.5 lakh)
+    • TDS: Deducted if interest > ₹40,000/year; submit Form 15G/15H to avoid
+    • Premature Withdrawal: Allowed with ~1% penalty on applicable rate
+    • Sweep-in FD: Auto-breaks in ₹1,000 units when savings balance is low
+    • Loan against FD: Up to 90% of FD value, quick processing
+
+  RECURRING DEPOSIT:
+    • Minimum: ₹100/month
+    • Tenure: 6 months to 10 years
+    • Same interest rates as FD
+    • Good for regular monthly savings habit
+
+  When exploring, end with: "Kitni rashi invest karna chahenge aur kitne samay ke liye?"
+
+  --- STAGE 2: COLLECT (when customer wants to open FD/RD) ---
+  1. FD minimum: ₹1000, max tenure: 10 years
+  2. CURRENT RATES (check branch rate card — changes quarterly): ~6.5% to 7.25% for general; Senior citizen +0.50%
+  3. TDS: If FD interest > ₹40,000/year — TDS deducted; submit Form 15G/15H to avoid if income below taxable limit
+  4. PREMATURE WITHDRAWAL: Allowed with penalty (usually 1% less than applicable rate)
+  5. SWEEP-IN FD: Link to savings account — auto-breaks in units of ₹1000 if needed
+  6. RD: ₹100/month minimum, 6 months to 10 years
+  Suggested opener: 'जी, FD के लिए — कितनी राशि और कितने समय के लिए invest करना है?'

@@ -1,0 +1,49 @@
+# VaaniBank AI — Render Deployment Blueprint
+# PSBs Hackathon 2026 | Team Vectora
+
+services:
+  - type: web
+    name: vaanibank-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT --ws-ping-interval 20 --ws-ping-timeout 20"
+    envVars:
+      - key: HF_HOME
+        value: "/opt/render/project/src/backend/.cache/huggingface"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: APP_ENV
+        value: production
+      - key: APP_PORT
+        value: 10000
+      - key: ALLOWED_ORIGINS
+        value: "https://vaanibank-customer.netlify.app,https://vaanibank-staff.netlify.app,http://localhost:5173,http://localhost:5174"
+      - key: APP_URL
+        value: "https://vaanibank-customer.netlify.app"
+      - key: DEMO_MODE
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vaanibank-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: vaanibank-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+databases:
+  - name: vaanibank-db
+    plan: free
+    region: oregon
+
+# Note: Redis requires Render paid plan for Blueprint.
+# For free tier, create Redis manually from dashboard.

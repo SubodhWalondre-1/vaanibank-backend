@@ -1,0 +1,158 @@
+{
+  "intent": "PERSONAL_LOAN",
+  "product_name": "Union Bank of India Personal Loan",
+  "tagline": "Union Personal Loan — For Every Need",
+  "last_updated": "2024-01",
+
+  "interest_rates": {
+    "note": "Rate is determined based on CIBIL score and employment type",
+    "slabs": [
+      { "profile": "Govt / PSU salaried, CIBIL 750+", "rate": "11.40% p.a." },
+      { "profile": "Private salaried, CIBIL 750+",    "rate": "12.00% p.a." },
+      { "profile": "Salaried, CIBIL 700-749",         "rate": "13.00% p.a." },
+      { "profile": "Self-employed, CIBIL 750+",       "rate": "13.50% p.a." },
+      { "profile": "Self-employed, CIBIL 700-749",    "rate": "14.50% p.a." }
+    ]
+  },
+
+  "loan_limits": {
+    "salaried_govt_psu":     "Up to ₹15 Lakh",
+    "salaried_private":      "Up to ₹10 Lakh",
+    "self_employed":         "Up to ₹5 Lakh",
+    "minimum":               "₹50,000"
+  },
+
+  "tenure": {
+    "maximum": "5 years (60 months)",
+    "minimum": "1 year (12 months)"
+  },
+
+  "eligibility": {
+    "age": {
+      "minimum": "21 years",
+      "maximum": "60 years (retirement age, salaried) / 65 years (self-employed)"
+    },
+    "employment_types": ["Salaried — Govt/PSU/Defence", "Salaried — Private Company (min 2 years)", "Self-Employed Professional (CA, Doctor, etc.)", "Pensioner (Union Bank pension account)"],
+    "minimum_income": {
+      "salaried":      "₹15,000 per month net take-home",
+      "self_employed": "₹1,80,000 per year (ITR basis)"
+    },
+    "cibil_minimum":       "700",
+    "union_bank_account":  "Salary account with Union Bank is preferred (faster processing)",
+    "work_experience": {
+      "salaried":      "Minimum 1 year with current employer",
+      "self_employed": "Minimum 2 years in the same profession"
+    }
+  },
+
+  "documents_required": {
+    "identity_proof": ["Aadhaar Card", "PAN Card (mandatory)", "Voter ID", "Passport"],
+    "address_proof":  ["Aadhaar Card", "Utility Bill", "Rental Agreement"],
+    "income_documents": {
+      "salaried": [
+        "Last 3 months salary slips",
+        "Form 16 (latest)",
+        "6 months bank statement",
+        "Employment ID card / appointment letter"
+      ],
+      "self_employed": [
+        "ITR last 2 years with computation",
+        "Bank statement last 12 months",
+        "Business proof (GST / Trade licence)"
+      ],
+      "pensioner": [
+        "PPO (Pension Payment Order)",
+        "Last 3 months pension credit statement"
+      ]
+    }
+  },
+
+  "processing_fee": {
+    "percentage": "1% of loan amount",
+    "minimum": "₹1,000",
+    "maximum": "₹5,000",
+    "gst": "18% GST extra"
+  },
+
+  "prepayment_charges": {
+    "after_6_months":  "NIL",
+    "within_6_months": "2% of outstanding principal"
+  },
+
+  "special_schemes": [
+    {
+      "name": "Union Personal Loan for Pensioners",
+      "for": "Union Bank pensioners",
+      "benefit": "Loan up to 18x monthly pension, no income proof needed"
+    },
+    {
+      "name": "Union Saral Personal Loan",
+      "for": "Existing Union Bank customers with good repayment history",
+      "benefit": "Pre-approved offers, minimal documentation"
+    },
+    {
+      "name": "Union Personal Loan for Defence",
+      "for": "Indian Army / Navy / Air Force personnel",
+      "benefit": "Lower rate, higher loan amount"
+    }
+  ],
+
+  "process_steps": [
+    {
+      "step": 1,
+      "title": "Eligibility & Pre-check",
+      "step_text_hindi": "ग्राहक की आयु, आय और सिबिल स्कोर सत्यापित करें। जाँचें कि वेतन खाता यूनियन बैंक में है या नहीं।",
+      "detail": "Verify age, income, and CIBIL score.",
+      "time": "5 minutes"
+    },
+    {
+      "step": 2,
+      "title": "Loan Amount & EMI Calculation",
+      "step_text_hindi": "अधिकतम ऋण = मासिक शुद्ध वेतन का १५ गुना। ईएमआई मासिक आय के ४०-५०% से अधिक नहीं होनी चाहिए।",
+      "detail": "Max loan = 15x monthly net salary. EMI should not exceed 40-50% of income.",
+      "time": "5 minutes"
+    },
+    {
+      "step": 3,
+      "title": "Document Collection",
+      "step_text_hindi": "केवाईसी और आय संबंधी सभी दस्तावेज़ एकत्र करें।",
+      "detail": "Collect KYC and income documents",
+      "time": "Depends on customer"
+    },
+    {
+      "step": 4,
+      "title": "Submit Application",
+      "step_text_hindi": "शाखा में फ़ॉर्म भरें या ऑनलाइन पोर्टल पर आवेदन जमा करें।",
+      "detail": "Fill form at branch or submit application on online portal",
+      "time": "1 working day"
+    },
+    {
+      "step": 5,
+      "title": "Verification & Sanction",
+      "step_text_hindi": "रोजगार सत्यापन के बाद स्वीकृति पत्र जारी किया जाएगा।",
+      "detail": "Employment verification followed by sanction letter issuance",
+      "time": "3-7 working days"
+    },
+    {
+      "step": 6,
+      "title": "Loan Disbursement",
+      "step_text_hindi": "ऋण राशि सीधे ग्राहक के बचत या चालू खाते में जमा की जाएगी।",
+      "detail": "Loan amount credited directly to customer's savings/current account",
+      "time": "Same day or next working day"
+    }
+  ],
+
+  "emi_examples": [
+    { "loan": "₹2 Lakh",  "tenure": "3 years", "rate": "11.40%", "emi": "~₹6,580/month" },
+    { "loan": "₹5 Lakh",  "tenure": "4 years", "rate": "11.40%", "emi": "~₹13,100/month" },
+    { "loan": "₹10 Lakh", "tenure": "5 years", "rate": "11.40%", "emi": "~₹21,990/month" }
+  ],
+
+  "rejection_reasons": [
+    "CIBIL score below 700",
+    "Existing EMIs too high (FOIR > 50%)",
+    "Employment instability — frequent job changes",
+    "Incomplete documents",
+    "Loan overdue / NPA history"
+  ]
+}

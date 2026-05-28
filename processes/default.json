@@ -1,0 +1,60 @@
+{
+  "intent": "GENERAL",
+  "product_name": "Union Bank of India — General Assistance",
+  "last_updated": "2024-01",
+
+  "bank_overview": {
+    "full_name": "Union Bank of India",
+    "type": "Public Sector Bank — Government of India",
+    "established": "1919",
+    "headquarters": "Mumbai, Maharashtra",
+    "tagline": "Good People to Bank With",
+    "total_branches": "8,500+ across India",
+    "atms": "10,000+",
+    "customer_base": "15 Crore+ customers"
+  },
+
+  "key_products_summary": [
+    { "intent": "HOME_LOAN",       "keyword": ["home loan", "ghar", "property loan", "housing"],           "file": "home_loan.json" },
+    { "intent": "PERSONAL_LOAN",   "keyword": ["personal loan", "cash loan", "urgent loan"],               "file": "personal_loan.json" },
+    { "intent": "EDUCATION_LOAN",  "keyword": ["education loan", "student loan", "padhai", "college"],     "file": "education_loan.json" },
+    { "intent": "VEHICLE_LOAN",    "keyword": ["car loan", "vehicle loan", "gaadi", "bike loan"],          "file": "vehicle_loan.json" },
+    { "intent": "FIXED_DEPOSIT",   "keyword": ["FD", "fixed deposit", "invest", "interest"],               "file": "fixed_deposit.json" },
+    { "intent": "ACCOUNT_OPENING", "keyword": ["account open", "khata kholna", "savings", "current"],     "file": "account_opening.json" },
+    { "intent": "CIBIL_INFO",      "keyword": ["CIBIL", "credit score", "credit history"],                 "file": "cibil_info.json" }
+  ],
+
+  "general_process_steps": [
+    { "step": 1, "title": "Understand Customer Requirements",  "detail": "Ask an open-ended question — what service does the customer need?" },
+    { "step": 2, "title": "Identify the Right Product",        "detail": "Identify the relevant product from the list above" },
+    { "step": 3, "title": "Eligibility Check",                 "detail": "Confirm basic eligibility — age, income, CIBIL" },
+    { "step": 4, "title": "Provide Document List",             "detail": "Give the customer a product-specific document checklist" },
+    { "step": 5, "title": "Application Process Guide",         "detail": "Suggest the best channel — online or branch" }
+  ],
+
+  "useful_numbers": {
+    "customer_care":      "1800-22-2244 (toll-free, 24x7)",
+    "missed_call_balance": "09223008586",
+    "sms_banking":         "UBAL <last 4 digits of account> to 09223008586",
+    "net_banking":         "https://www.unionbankonline.co.in",
+    "mobile_app":          "Union Mobile (Android + iOS)"
+  },
+
+  "digital_services": [
+    "UPI (Union Bank UPI)",
+    "IMPS / NEFT / RTGS — free via app",
+    "Union Mobile App",
+    "Net Banking",
+    "WhatsApp Banking — +91 9289292892",
+    "Chatbot — Union Mitra (on website)",
+    "Video KYC — account opening from home"
+  ],
+
+  "complaint_channels": [
+    { "channel": "Branch",           "detail": "Meet the Branch Manager" },
+    { "channel": "Toll-free",        "detail": "1800-22-2244" },
+    { "channel": "Email",            "detail": "unionbank@unionbankofindia.com" },
+    { "channel": "Online",           "detail": "https://www.unionbankofindia.co.in/complaint" },
+    { "channel": "Banking Ombudsman","detail": "RBI Ombudsman — if bank doesn't resolve in 30 days" }
+  ]
+}

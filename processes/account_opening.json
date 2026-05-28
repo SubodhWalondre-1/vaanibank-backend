@@ -1,0 +1,180 @@
+{
+  "intent": "ACCOUNT_OPENING",
+  "product_name": "Union Bank of India — Account Opening",
+  "tagline": "Open an Account with Union Bank, Build a Secure Future",
+  "last_updated": "2024-01",
+
+  "account_types": [
+    {
+      "type": "Union Savings Account (Basic)",
+      "minimum_balance": "₹500 (rural) / ₹1,000 (semi-urban) / ₹2,000 (urban/metro)",
+      "interest_rate": "2.75% p.a. on daily balance",
+      "features": ["Free ATM card", "Internet banking", "Mobile banking", "Cheque book"],
+      "best_for": "General public — salaried, students, housewives"
+    },
+    {
+      "type": "Union Savings Account — Zero Balance (BSBD)",
+      "minimum_balance": "NIL — Zero balance account",
+      "interest_rate": "2.75% p.a.",
+      "features": ["Basic ATM card", "4 free ATM withdrawals/month", "No minimum balance penalty"],
+      "best_for": "Low income groups, first-time bankers, EWS",
+      "note": "Basic Savings Bank Deposit — RBI mandated product"
+    },
+    {
+      "type": "Union Privilege Savings Account",
+      "minimum_balance": "₹1 Lakh (quarterly average)",
+      "interest_rate": "2.75% p.a.",
+      "features": ["Unlimited free ATM transactions", "Free RTGS/NEFT", "Priority banking", "Free locker (subject to availability)", "Dedicated relationship manager"],
+      "best_for": "HNI customers, senior banking relationship"
+    },
+    {
+      "type": "Union Salary Account",
+      "minimum_balance": "NIL — Zero balance",
+      "interest_rate": "2.75% p.a.",
+      "features": ["Salary credit", "Overdraft up to 2x monthly salary", "Free accident insurance ₹1 Lakh", "Personal loan at preferential rate"],
+      "best_for": "Salaried employees (company tie-up required)"
+    },
+    {
+      "type": "Union Student Account",
+      "minimum_balance": "NIL",
+      "age_limit": "10 to 25 years",
+      "features": ["Free ATM card", "Mobile banking", "Education loan facility", "No charges till age 25"],
+      "best_for": "School/college students"
+    },
+    {
+      "type": "Union Current Account",
+      "minimum_balance": "₹5,000 to ₹25,000 (varies by city)",
+      "interest_rate": "No interest on current account",
+      "features": ["Unlimited transactions", "Overdraft facility", "Trade finance", "Bulk NEFT/RTGS"],
+      "best_for": "Business owners, traders, professionals"
+    },
+    {
+      "type": "Jan Dhan Account (PMJDY)",
+      "minimum_balance": "NIL",
+      "features": ["RuPay ATM card", "Accidental insurance ₹2 Lakh", "Life insurance ₹30,000", "Overdraft ₹10,000 (after 6 months)", "Direct benefit transfer (DBT)"],
+      "best_for": "Financially excluded sections — rural, unbanked population"
+    },
+    {
+      "type": "Senior Citizen Savings Account",
+      "minimum_balance": "₹500",
+      "age": "60 years and above",
+      "features": ["Priority service at branch", "Doorstep banking", "Free RTGS/NEFT", "Special FD rates (0.50% extra)"],
+      "best_for": "Retired / senior citizens"
+    }
+  ],
+
+  "documents_required": {
+    "for_individual": {
+      "identity_proof": ["Aadhaar Card (OTP based eKYC also possible)", "PAN Card", "Passport", "Voter ID", "Driving Licence"],
+      "address_proof":  ["Aadhaar Card", "Passport", "Utility Bill (not older than 3 months)", "Ration Card", "Rent Agreement"],
+      "photos":         "2 passport size photographs",
+      "pan_mandatory":  "PAN or Form 60 (if PAN not available) — mandatory for all accounts",
+      "note":           "Video KYC is also available — no branch visit required"
+    },
+    "for_minor_account": {
+      "required": ["Birth certificate of minor", "Guardian's KYC documents", "Guardian's Aadhaar + PAN"]
+    },
+    "for_joint_account": {
+      "required": ["KYC documents of all joint holders", "Joint account mandate — Either or Survivor / Former or Survivor"]
+    },
+    "for_current_account_business": {
+      "required": [
+        "Business registration proof (GST, trade licence, partnership deed, MOA/AOA)",
+        "PAN of business entity",
+        "Address proof of business",
+        "KYC of all authorized signatories"
+      ]
+    }
+  },
+
+  "modes_of_opening": [
+    {
+      "mode": "Branch Visit",
+      "process": "Fill the form, submit documents, account activates same day or next day",
+      "time": "30-60 minutes at branch"
+    },
+    {
+      "mode": "Online (Video KYC)",
+      "process": "Apply via Union Bank website/app, schedule a Video KYC call",
+      "time": "15-20 minutes from home",
+      "link": "https://www.unionbankofindia.co.in/online-account-opening"
+    },
+    {
+      "mode": "Mobile App (Union Mobile)",
+      "process": "Download the app, open via Aadhaar OTP",
+      "time": "10-15 minutes",
+      "app": "Union Mobile (Google Play / App Store)"
+    }
+  ],
+
+  "nomination": {
+    "mandatory": "Strongly recommended — fill Form DA1",
+    "who_can_be_nominee": "Any individual — spouse, child, parent, sibling",
+    "note": "Nominee receives funds after account holder's demise"
+  },
+
+  "insurance_benefits": {
+    "jan_dhan": "Accidental insurance ₹2 Lakh (RuPay card must be used for a purchase/transaction)",
+    "salary_account": "Accidental insurance ₹1 Lakh (free)",
+    "pmjjby": "PM Jeevan Jyoti Bima — ₹330/year premium, ₹2 Lakh life cover (opt-in)",
+    "pmsby":  "PM Suraksha Bima — ₹20/year premium, ₹2 Lakh accidental cover (opt-in)"
+  },
+
+  "charges": {
+    "atm_withdrawals": {
+      "union_bank_atm": "Unlimited free",
+      "other_bank_atm": "5 free per month (metro: 3 free), ₹21 per transaction after limit"
+    },
+    "neft_rtgs": "Free via Net Banking / Mobile Banking",
+    "cheque_book": "First 25 leaves free, then ₹4 per leaf",
+    "account_statement": "Free online, ₹50 per physical statement",
+    "minimum_balance_penalty": "₹100 to ₹500 per quarter depending on shortfall"
+  },
+
+  "process_steps": [
+    {
+      "step": 1,
+      "title": "Understand Customer Profile",
+      "detail": "What is their occupation? What is their income source? Business owner? Student? Senior citizen? — This determines the right account type",
+      "time": "3-5 minutes"
+    },
+    {
+      "step": 2,
+      "title": "Recommend Account Type",
+      "detail": "Suggest the best account based on profile. Low income = BSBD/Jan Dhan. Business = Current. Salaried = Salary/Savings",
+      "time": "2 minutes"
+    },
+    {
+      "step": 3,
+      "title": "KYC Documents Verify",
+      "detail": "Check original documents, keep photocopies, verify Aadhaar OTP (eKYC preferred)",
+      "time": "10-15 minutes"
+    },
+    {
+      "step": 4,
+      "title": "Fill Application Forms",
+      "detail": "Account opening form, nomination form (DA1), FATCA declaration (if foreign income/citizenship applies)",
+      "time": "10 minutes"
+    },
+    {
+      "step": 5,
+      "title": "Initial Deposit",
+      "detail": "Minimum balance as per account type. Not required for zero balance accounts",
+      "time": "2 minutes"
+    },
+    {
+      "step": 6,
+      "title": "Account Activate & Kit Issue",
+      "detail": "Issue passbook, ATM card (delivery 7-10 days), Net Banking credentials",
+      "time": "Same day activation"
+    }
+  ],
+
+  "staff_tips": [
+    "Jan Dhan accounts have ₹10,000 overdraft facility after 6 months — most customers are not aware",
+    "Always pitch PMJJBY (₹330) and PMSBY (₹20) — very few customers enroll",
+    "Mention the Video KYC option — convenient for elderly or busy customers",
+    "Ensure the nomination form is always filled — it prevents legal issues later",
+    "If the customer is a senior citizen, explain special privileges — priority service, doorstep banking"
+  ]
+}
