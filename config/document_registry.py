@@ -27,6 +27,22 @@ _OPTIONAL = {
 }
 
 
+# ── Shared multilingual labels for common documents ───────────────────────────
+_AADHAAR_LABELS = {
+    "hi": "आधार कार्ड", "mr": "आधार कार्ड", "ta": "ஆதார் அட்டை",
+    "te": "ఆధార్ కార్డ్", "bn": "আধার কার্ড", "kn": "ಆಧಾರ್ ಕಾರ್ಡ್",
+    "or": "ଆଧାର କାର୍ଡ", "pa": "ਆਧਾਰ ਕਾਰਡ", "gu": "આધાર કાર્ડ",
+    "ml": "ఆധാർ കാർഡ്",
+}
+
+_PAN_LABELS = {
+    "hi": "पैन कार्ड", "mr": "पॅन कार्ड", "ta": "பான் अட்டை",
+    "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾൻ ಕಾರ್ಡ್",
+    "or": "ପ୍ୟାନ କାର୍ଡ", "pa": "ਪੈਨ ਕਾਰਡ", "gu": "પાન કાર્ડ",
+    "ml": "പാൻ കാർഡ്",
+}
+
+
 DOCUMENT_REGISTRY: dict = {
     # ═══════════════════════════════════════════════════════════════════════════
     # 1. ACCOUNT OPENING
@@ -35,12 +51,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "aadhaar",
             "label_en": "Aadhaar Card",
-            "labels": {
-                "hi": "आधार कार्ड", "mr": "आधार कार्ड", "ta": "ஆதார் அட்டை",
-                "te": "ఆధార్ కార్డ్", "bn": "আধার কার্ড", "kn": "ಆಧಾರ್ ಕಾರ್ಡ್",
-                "or": "ଆଧାର କାର୍ଡ", "pa": "ਆਧਾਰ ਕਾਰਡ", "gu": "આધાર કાર્ડ",
-                "ml": "ആധാർ കാർഡ്",
-            },
+            "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
             "collected_info_key": "aadhaar_provided",
@@ -48,12 +59,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "pan",
             "label_en": "PAN Card",
-            "labels": {
-                "hi": "पैन कार्ड", "mr": "पॅन कार्ड", "ta": "பான் அட்டை",
-                "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾನ್ ಕಾರ್ಡ್",
-                "or": "ପ୍ୟାନ କାର୍ଡ", "pa": "ਪੈਨ ਕਾਰਡ", "gu": "પાન કાર્ડ",
-                "ml": "പാൻ കാർഡ്",
-            },
+            "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required",
             "collected_info_key": "pan_provided",
@@ -94,12 +100,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "aadhaar",
             "label_en": "Aadhaar Card",
-            "labels": {
-                "hi": "आधार कार्ड", "mr": "आधार कार्ड", "ta": "ஆதார் அட்டை",
-                "te": "ఆధార్ కార్డ్", "bn": "আধার কার্ড", "kn": "ಆಧಾರ್ ಕಾರ್ಡ್",
-                "or": "ଆଧାର କାର୍ଡ", "pa": "ਆਧਾਰ ਕਾਰਡ", "gu": "આધાર કાર્ડ",
-                "ml": "ആധാർ കാർഡ്",
-            },
+            "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
             "collected_info_key": "aadhaar_provided",
@@ -107,12 +108,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "pan",
             "label_en": "PAN Card",
-            "labels": {
-                "hi": "पैन कार्ड", "mr": "पॅन कार्ड", "ta": "பான் அட்டை",
-                "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾನ್ ಕಾರ್ಡ್",
-                "or": "ପ୍ୟାନ କାର୍ଡ", "pa": "ਪੈਨ ਕਾਰਡ", "gu": "પાન કાર્ડ",
-                "ml": "പാൻ കാർഡ്",
-            },
+            "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required",
             "collected_info_key": "pan_provided",
@@ -244,12 +240,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "aadhaar",
             "label_en": "Aadhaar Card",
-            "labels": {
-                "hi": "आधार कार्ड", "mr": "आधार कार्ड", "ta": "ஆதார் அட்டை",
-                "te": "ఆధార్ కార్డ్", "bn": "আধার কার্ড", "kn": "ಆಧಾರ್ ಕಾರ್ಡ್",
-                "or": "ଆଧାର କାର୍ଡ", "pa": "ਆਧਾਰ ਕਾਰਡ", "gu": "આધાર કાર્ડ",
-                "ml": "ആധാർ കാർഡ്",
-            },
+            "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
             "collected_info_key": "aadhaar_provided",
@@ -257,12 +248,7 @@ DOCUMENT_REGISTRY: dict = {
         {
             "id": "pan",
             "label_en": "PAN Card",
-            "labels": {
-                "hi": "पैन कार्ड", "mr": "पॅन कार्ड", "ta": "பான் அட்டை",
-                "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾನ್ ಕಾರ್ಡ್",
-                "or": "ପ୍ୟାନ କାର୍ଡ", "pa": "ਪੈਨ ਕਾਰਡ", "gu": "પાન કાર્ડ",
-                "ml": "പാൻ കാർഡ്",
-            },
+            "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required — TDS 20% without PAN",
             "collected_info_key": "pan_provided",

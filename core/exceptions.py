@@ -22,9 +22,9 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger("vaanibank.exceptions")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # BASE EXCEPTION
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class VaaniBankException(Exception):
     """
@@ -59,9 +59,9 @@ class VaaniBankException(Exception):
         }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # AUTH & ACCESS
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class AuthenticationError(VaaniBankException):
     """Raised when credentials are invalid or token is expired/missing."""
@@ -94,9 +94,9 @@ class AuthorizationError(VaaniBankException):
         super().__init__(message=message, detail=detail, required_role=required_role, **context)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # SESSION
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class SessionNotFoundError(VaaniBankException):
     """Raised when a session lookup by token number or ID returns nothing."""
@@ -174,9 +174,9 @@ class SessionNotActiveError(VaaniBankException):
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # AI PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class STTError(VaaniBankException):
     """Raised when all STT fallback attempts fail."""
@@ -271,9 +271,9 @@ class PDFGenerationError(VaaniBankException):
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # RESOURCE / GENERIC
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class ResourceNotFoundError(VaaniBankException):
     """Generic 404 for any resource not found."""
@@ -308,11 +308,11 @@ class ValidationError(VaaniBankException):
         super().__init__(message=message, detail=detail, field=field, **context)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # FASTAPI EXCEPTION HANDLERS
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
-async def vaanibank_exception_handler(
+def vaanibank_exception_handler(
     request: Request,
     exc: VaaniBankException,
 ) -> JSONResponse:
@@ -345,7 +345,7 @@ async def vaanibank_exception_handler(
     )
 
 
-async def unhandled_exception_handler(
+def unhandled_exception_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:

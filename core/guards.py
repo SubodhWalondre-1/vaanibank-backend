@@ -47,9 +47,9 @@ from models import Branch, Session, StaffMember, StaffRole
 logger = logging.getLogger("vaanibank.guards")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # CONSTANTS
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 _MANAGER_CREATABLE_ROLES = {StaffRole.teller.value, StaffRole.supervisor.value}
 _ALL_ROLES = {r.value for r in StaffRole}
@@ -58,10 +58,10 @@ _ALL_ROLES = {r.value for r in StaffRole}
 _MANAGEMENT_ROLES = {StaffRole.manager.value, StaffRole.admin.value}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # LOW-LEVEL ASSERTION HELPERS
 # (synchronous — called inside endpoint body, not as Depends)
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 def assert_own_branch(current: StaffMember, branch_id: int) -> None:
     """
@@ -194,15 +194,15 @@ def check_management_role(current: StaffMember) -> None:
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # FASTAPI DEPENDENCY GUARDS
 # (async — used as Depends(...) in route signatures)
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 from core.security import get_current_staff  # noqa: E402  (after models import)
 
 
-async def require_manager_or_admin(
+def require_manager_or_admin(
     current_staff: StaffMember = Depends(get_current_staff),
 ) -> StaffMember:
     """
@@ -216,7 +216,7 @@ async def require_manager_or_admin(
     return current_staff
 
 
-async def require_admin(
+def require_admin(
     current_staff: StaffMember = Depends(get_current_staff),
 ) -> StaffMember:
     """
@@ -334,9 +334,9 @@ async def require_staff_target_access(
     return target, branch, current_staff
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # SESSION GUARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 async def require_session_scope(
     session_id: int = Path(...),
@@ -365,11 +365,11 @@ async def require_session_scope(
     return session, current_staff
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # AUDIT GUARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
-async def require_audit_access(
+def require_audit_access(
     current_staff: StaffMember = Depends(get_current_staff),
 ) -> StaffMember:
     """
@@ -380,11 +380,11 @@ async def require_audit_access(
     return current_staff
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # SYSTEM SETTINGS GUARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
-async def require_system_settings_access(
+def require_system_settings_access(
     current_staff: StaffMember = Depends(get_current_staff),
 ) -> StaffMember:
     """
@@ -395,11 +395,11 @@ async def require_system_settings_access(
     return current_staff
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # PII LOG GUARD
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
-async def require_pii_log_access(
+def require_pii_log_access(
     current_staff: StaffMember = Depends(get_current_staff),
 ) -> StaffMember:
     """
@@ -410,9 +410,9 @@ async def require_pii_log_access(
     return current_staff
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 # CONVENIENCE RE-EXPORTS for clean import in routers
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 __all__ = [
     # Dependency guards (use as Depends(...))

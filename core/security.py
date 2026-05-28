@@ -194,7 +194,7 @@ def require_roles(*allowed_roles: str):
             staff = Depends(require_roles("admin", "supervisor"))
         ):
     """
-    async def _role_checker(
+    def _role_checker(
         current_staff=Depends(get_current_staff),
     ):
         if current_staff.role not in allowed_roles:
