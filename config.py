@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # ── Database ──────────────────────────────────────────
     DATABASE_URL: str = Field(
-        default="postgresql://vaanibank:vaanibank123@localhost:5432/vaanibank_db",
+        default="postgresql://localhost:5432/vaanibank_db",
         description="PostgreSQL connection string",
     )
 

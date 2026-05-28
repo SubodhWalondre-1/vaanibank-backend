@@ -175,7 +175,7 @@ You are embedded in the bank's staff dashboard. A customer is speaking {source_l
 
 === YOUR ROLE ===
 You are the staff's silent expert co-pilot. You:
-1. Translate what the customer said into Hindi (for staff to read)
+1. Translate what the customer said into Hindi in Devanagari script (for staff to read)
 2. Detect what the customer ACTUALLY wants (intent detection)
 3. Sense how the customer is feeling (sentiment)
 4. Give the staff a READY-TO-SPEAK response in Hindi — natural, polite, professional
@@ -347,7 +347,7 @@ For intent = general, return EXACTLY these fields:
 === OUTPUT FORMAT ===
 Return ONLY valid JSON — no markdown, no explanation, no extra text:
 {{
-  "translation": "<Hindi translation of what customer said>",
+  "translation": "<Hindi translation of what customer said in Devanagari script — e.g. 'मुझे होम लोन चाहिए', NEVER Hinglish/Latin script>",
   "intent": "<one of: account_opening|loan_enquiry|kyc_update|card_services|balance_enquiry|fixed_deposit|general>",
   "intent_confidence": <0.0 to 1.0>,
   "sentiment": "<calm|frustrated|confused|urgent>",
@@ -661,9 +661,11 @@ class AIService:
 
         # Use temp files for input (ffmpeg needs seekable input for some formats)
         import tempfile
-        with tempfile.NamedTemporaryFile(suffix=src_ext, delete=False) as src:
-            src.write(audio_bytes)
-            src_path = src.name
+        tmp_fd, src_path = await asyncio.to_thread(tempfile.mkstemp, suffix=src_ext)
+        await asyncio.to_thread(os.close, tmp_fd)
+
+        async with aiofiles.open(src_path, "wb") as src:
+            await src.write(audio_bytes)
 
         dst_path = src_path.rsplit(".", 1)[0] + ".wav"
 
@@ -718,11 +720,11 @@ class AIService:
 
         finally:
             try:
-                os.unlink(src_path)
+                await asyncio.to_thread(os.unlink, src_path)
             except OSError:
                 pass
             try:
-                os.unlink(dst_path)
+                await asyncio.to_thread(os.unlink, dst_path)
             except OSError:
                 pass
 
@@ -778,11 +780,14 @@ class AIService:
         Free, extremely fast (Groq LPU), uses existing GROQ_API_KEY.
         Supports all 10 Indian languages via Whisper multilingual model.
         """
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp.write(audio_bytes)
-            tmp_path = tmp.name
+        import aiofiles
+        tmp_fd, tmp_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".wav")
+        await asyncio.to_thread(os.close, tmp_fd)
 
         try:
+            async with aiofiles.open(tmp_path, "wb") as tmp:
+                await tmp.write(audio_bytes)
+
             transcription = await asyncio.to_thread(
                 self._groq_whisper_sync,
                 tmp_path,
@@ -794,7 +799,7 @@ class AIService:
             return text, 0.90, "whisper-large-v3-turbo-groq"
         finally:
             try:
-                os.unlink(tmp_path)
+                await asyncio.to_thread(os.unlink, tmp_path)
             except OSError:
                 pass
 
@@ -1410,7 +1415,7 @@ class AIService:
                         "content": (
                             f"You are a professional Indian banking translator."
                             f" Translate the following {source_name} text to {target_name}."
-                            f" Return ONLY the translated text in {target_name} script."
+                            f" Return ONLY the translated text in {target_name} script (if target is Hindi, use Devanagari script e.g. 'मुझे होम लोन चाहिए', NEVER Hinglish/Latin script)."
                             f" Preserve masked placeholders like ****, [masked], and last-four digits exactly."
                             f" No English. No explanation."
                         ),

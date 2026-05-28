@@ -17,6 +17,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -102,6 +103,17 @@ from services.llm_utils import (
 
 # ── RAG Knowledge Base Loader ──────────────────────────────────────────────────
 
+@lru_cache(maxsize=1)
+def _load_ubi_kb_yaml_cached() -> dict:
+    """
+    Synchronously load and parse the official UBI knowledge base YAML.
+    Using lru_cache avoids repeated disk I/O and parsing overhead for static files.
+    """
+    kb_path = Path(__file__).parent.parent / "ubi_knowledge_base.yaml"
+    with open(kb_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
 async def _load_ubi_knowledge_base(intent: str = "general") -> str:
     """Load and format relevant sections of the official UBI knowledge base."""
     kb_path = Path(__file__).parent.parent / "ubi_knowledge_base.yaml"
@@ -109,75 +121,73 @@ async def _load_ubi_knowledge_base(intent: str = "general") -> str:
         return ""
 
     try:
-        async with aiofiles.open(kb_path, mode="r", encoding="utf-8") as f:
-            content = await f.read()
-            kb_data = yaml.safe_load(content)
+        kb_data = _load_ubi_kb_yaml_cached()
+        
+        lines = ["[OFFICIAL UNION BANK OF INDIA KNOWLEDGE BASE]"]
+        
+        # 1. KYC Standards (Relevant for almost everything)
+        if "kyc_standards" in kb_data:
+            lines.append("\n=== KYC STANDARDS (RBI/UBI) ===")
+            ks = kb_data["kyc_standards"]
+            lines.append(f"- Mandatory Baseline: {', '.join(ks.get('mandatory_baseline', []))}")
+            lines.append(f"- Accepted POI: {', '.join(ks.get('proof_of_identity_poi', []))}")
+
+        # 2. Intent-Specific Content
+        if intent == "loan_enquiry":
+            if "interest_rates" in kb_data:
+                lines.append("\n=== LOAN INTEREST RATES ===")
+                loans = kb_data["interest_rates"].get("loan_products", {})
+                for loan, info in loans.items():
+                    lines.append(f"- {loan.replace('_', ' ').title()}: {info.get('range')}")
+                    if info.get("lowest_rate_logic"):
+                        lines.append(f"  * {info['lowest_rate_logic']}")
             
-            lines = ["[OFFICIAL UNION BANK OF INDIA KNOWLEDGE BASE]"]
-            
-            # 1. KYC Standards (Relevant for almost everything)
-            if "kyc_standards" in kb_data:
-                lines.append("\n=== KYC STANDARDS (RBI/UBI) ===")
-                ks = kb_data["kyc_standards"]
-                lines.append(f"- Mandatory Baseline: {', '.join(ks.get('mandatory_baseline', []))}")
-                lines.append(f"- Accepted POI: {', '.join(ks.get('proof_of_identity_poi', []))}")
+            if "eligibility" in kb_data:
+                lines.append("\n=== LOAN ELIGIBILITY ===")
+                for prod, info in kb_data["eligibility"].items():
+                    if "loan" in prod:
+                        lines.append(f"- {prod.replace('_', ' ').title()}: {info}")
 
-            # 2. Intent-Specific Content
-            if intent == "loan_enquiry":
-                if "interest_rates" in kb_data:
-                    lines.append("\n=== LOAN INTEREST RATES ===")
-                    loans = kb_data["interest_rates"].get("loan_products", {})
-                    for loan, info in loans.items():
-                        lines.append(f"- {loan.replace('_', ' ').title()}: {info.get('range')}")
-                        if info.get("lowest_rate_logic"):
-                            lines.append(f"  * {info['lowest_rate_logic']}")
-                
-                if "eligibility" in kb_data:
-                    lines.append("\n=== LOAN ELIGIBILITY ===")
-                    for prod, info in kb_data["eligibility"].items():
-                        if "loan" in prod:
-                            lines.append(f"- {prod.replace('_', ' ').title()}: {info}")
+            if "document_checklists" in kb_data:
+                lines.append("\n=== LOAN DOCUMENTS ===")
+                dc = kb_data["document_checklists"]
+                for prod, info in dc.items():
+                    if "loan" in prod:
+                        lines.append(f"- {prod.replace('_', ' ').title()}: {info}")
 
-                if "document_checklists" in kb_data:
-                    lines.append("\n=== LOAN DOCUMENTS ===")
-                    dc = kb_data["document_checklists"]
-                    for prod, info in dc.items():
-                        if "loan" in prod:
-                            lines.append(f"- {prod.replace('_', ' ').title()}: {info}")
+            if "service_charges" in kb_data:
+                lines.append("\n=== LOAN CHARGES & FEES ===")
+                fees = kb_data["service_charges"].get("processing_fees", {})
+                for fee, val in fees.items():
+                    if "loan" in fee:
+                        lines.append(f"- {fee.replace('_', ' ').title()}: {val}")
 
-                if "service_charges" in kb_data:
-                    lines.append("\n=== LOAN CHARGES & FEES ===")
-                    fees = kb_data["service_charges"].get("processing_fees", {})
-                    for fee, val in fees.items():
-                        if "loan" in fee:
-                            lines.append(f"- {fee.replace('_', ' ').title()}: {val}")
+            if "penalties" in kb_data:
+                lines.append("\n=== LOAN PENALTIES ===")
+                for k, v in kb_data["penalties"].items():
+                    if "payment" in k:
+                        lines.append(f"- {k.replace('_', ' ').title()}: {v}")
 
-                if "penalties" in kb_data:
-                    lines.append("\n=== LOAN PENALTIES ===")
-                    for k, v in kb_data["penalties"].items():
-                        if "payment" in k:
-                            lines.append(f"- {k.replace('_', ' ').title()}: {v}")
+        elif intent == "account_opening":
+            if "savings_account_rules" in kb_data:
+                lines.append("\n=== SAVINGS ACCOUNT RULES ===")
+                sar = kb_data["savings_account_rules"]
+                lines.append(f"- Minimum Balance: {sar.get('qab_tiering', {}).get('with_cheque_book')}")
+                lines.append(f"- Penalties: {sar.get('shortfall_penalties', {}).get('structure')}")
 
-            elif intent == "account_opening":
-                if "savings_account_rules" in kb_data:
-                    lines.append("\n=== SAVINGS ACCOUNT RULES ===")
-                    sar = kb_data["savings_account_rules"]
-                    lines.append(f"- Minimum Balance: {sar.get('qab_tiering', {}).get('with_cheque_book')}")
-                    lines.append(f"- Penalties: {sar.get('shortfall_penalties', {}).get('structure')}")
+        elif intent == "fixed_deposit":
+            if "interest_rates" in kb_data:
+                lines.append("\n=== FD/RD INTEREST RATES ===")
+                deposits = kb_data["interest_rates"].get("deposit_products", {})
+                for dep, info in deposits.items():
+                    lines.append(f"- {dep.replace('_', ' ').title()}: {info}")
+            if "fixed_recurring_deposits" in kb_data:
+                lines.append("\n=== FD/RD RULES ===")
+                frd = kb_data["fixed_recurring_deposits"]
+                lines.append(f"- Peak Rate: {frd.get('interest_tiers', {}).get('peak_rate')}")
+                lines.append(f"- Senior Citizen: {frd.get('interest_tiers', {}).get('senior_citizen_premium')}")
 
-            elif intent == "fixed_deposit":
-                if "interest_rates" in kb_data:
-                    lines.append("\n=== FD/RD INTEREST RATES ===")
-                    deposits = kb_data["interest_rates"].get("deposit_products", {})
-                    for dep, info in deposits.items():
-                        lines.append(f"- {dep.replace('_', ' ').title()}: {info}")
-                if "fixed_recurring_deposits" in kb_data:
-                    lines.append("\n=== FD/RD RULES ===")
-                    frd = kb_data["fixed_recurring_deposits"]
-                    lines.append(f"- Peak Rate: {frd.get('interest_tiers', {}).get('peak_rate')}")
-                    lines.append(f"- Senior Citizen: {frd.get('interest_tiers', {}).get('senior_citizen_premium')}")
-
-            return "\n".join(lines)
+        return "\n".join(lines)
     except Exception as e:
         logger.warning("Failed to load UBI knowledge base: %s", e)
         return ""
@@ -235,6 +245,7 @@ async def run_transcription_pipeline(
         source_label: 'staff' or 'customer' — used only for logging.
     """
     start_time = time.time()
+    session_updates: Dict[str, Any] = {}
 
     # ── 1. STT ────────────────────────────────────────────────────────────────
     stt_result = await ai_service.transcribe(
@@ -290,18 +301,12 @@ async def run_transcription_pipeline(
         )
         existing_pii = existing_pii_result.scalar() or []
         merged_pii = list(set(existing_pii + stt_result.pii_types))
-        await db.execute(
-            update(Session)
-            .where(Session.id == session_id)
-            .values(pii_detected=True, pii_types_found=merged_pii)
-        )
+        session_updates["pii_detected"] = True
+        session_updates["pii_types_found"] = merged_pii
 
     # ── 6. Update session metadata ────────────────────────────────────────────
-    await db.execute(
-        update(Session)
-        .where(Session.id == session_id)
-        .values(stt_model_used=stt_result.model_used, total_exchanges=exchange_number)
-    )
+    session_updates["stt_model_used"] = stt_result.model_used
+    session_updates["total_exchanges"] = exchange_number
     # Note: deferred commit — all DB writes (exchange, PII, session metadata,
     # LLM results, collected_info) are committed in a single round-trip below.
 
@@ -417,14 +422,8 @@ async def run_transcription_pipeline(
                 intent=llm_result.intent,
             )
         )
-        await db.execute(
-            update(Session)
-            .where(Session.id == session_id)
-            .values(
-                sentiment_overall=llm_result.sentiment,
-                intent_detected=llm_result.intent,
-            )
-        )
+        session_updates["sentiment_overall"] = llm_result.sentiment
+        session_updates["intent_detected"] = llm_result.intent
 
         # ── Conversation Intelligence board ───────────────────────────────────
         merged_info = None
@@ -441,11 +440,14 @@ async def run_transcription_pipeline(
             )
             completion_pct = int((filled / max(total_fields, 1)) * 100)
 
-            # Persist collected_info to DB (part of single commit below)
+            session_updates["collected_data"] = merged_info
+
+        # Execute single consolidated update query to postgres for Session table
+        if session_updates:
             await db.execute(
                 update(Session)
                 .where(Session.id == session_id)
-                .values(collected_data=merged_info)
+                .values(**session_updates)
             )
 
         # ── SINGLE COMMIT — all DB mutations in one round-trip (P2 B-HIGH-1) ──
@@ -727,6 +729,20 @@ async def run_transcription_pipeline(
         traceback.print_exc()
         print(f"{'='*60}\n")
         logger.warning("LLM processing failed during %s transcribe: %s", source_label, exc)
+        
+        # Save whatever STT and Session metadata updates we successfully collected before the failure
+        try:
+            if session_updates:
+                await db.execute(
+                    update(Session)
+                    .where(Session.id == session_id)
+                    .values(**session_updates)
+                )
+            await db.commit()
+            logger.info("Successfully committed partial session metadata and exchange after LLM exception.")
+        except Exception as commit_exc:
+            logger.error("Failed to commit partial updates after LLM exception: %s", commit_exc)
+
         await ws_manager.broadcast_transcription(
             token_number=token_number,
             text_original=stt_result.text,
@@ -799,6 +815,13 @@ def _needs_hindi_translation_retry(
             return True
 
     if source_language_code == "mr" and _contains_marathi_markers(candidate_text):
+        return True
+
+    # Check if the translation lacks Devanagari characters entirely.
+    # Hindi/Marathi translations must be in Devanagari script (\u0900-\u097F).
+    # If the candidate contains no Devanagari characters, it is written in Latin (Hinglish) or another script.
+    has_devanagari = any("\u0900" <= ch <= "\u097F" for ch in (candidate_text or ""))
+    if not has_devanagari:
         return True
 
     return _contains_script(candidate_text, source_language_code)

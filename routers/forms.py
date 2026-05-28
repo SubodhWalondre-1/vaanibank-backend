@@ -168,6 +168,12 @@ def _save_signature(
         return None
 
     try:
+        # Strict validation of token_number to prevent path traversal
+        import re
+        if not re.match(r"^[A-Za-z0-9_\-]+$", token_number):
+            logger.warning("Potential path injection attempt blocked: %s", token_number)
+            return None
+
         # data URL format: "data:<mime>;base64,<encoded>"
         _header, encoded = data_url.split(",", 1)
         signature_bytes: bytes = base64.b64decode(encoded)
@@ -178,7 +184,17 @@ def _save_signature(
         # some cloud storage providers encode them).
         safe_token = token_number.replace("-", "_")
         filename = f"signature_{safe_token}_{session_id}.png"
+        
+        # Ensure the filename has no path components
+        filename = os.path.basename(filename)
         filepath = os.path.join(_SIGNATURE_DIR, filename)
+
+        # Canonical path boundary check to guarantee it writes inside the designated folder
+        real_dir = os.path.abspath(_SIGNATURE_DIR)
+        real_filepath = os.path.abspath(filepath)
+        if not real_filepath.startswith(real_dir + os.path.sep):
+            logger.warning("Path boundary violation blocked: %s", filepath)
+            return None
 
         with open(filepath, "wb") as fh:
             fh.write(signature_bytes)
@@ -289,8 +305,8 @@ async def submit_form(
     # We do this before commit so if it fails, we still have the data.
     # But it's independent of the DB transaction.
     signature_url: Optional[str] = _save_signature(
-        token_number=body.token_number,
-        session_id=body.session_id,
+        token_number=session_obj.token_number,
+        session_id=session_obj.id,
         data_url=body.signature_data_url,
     )
     signature_saved: bool = signature_url is not None
@@ -447,6 +463,7 @@ async def submit_form(
 async def get_signature(
     token_number: str,
     session_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
 ) -> Response:
     """
     Serve the signature PNG file for a given session token.
@@ -463,12 +480,40 @@ async def get_signature(
       • Content-Disposition: attachment (triggers browser download)
       • Cache-Control: no-store (signatures are PII — never cache)
     """
-    safe_token: str = token_number.replace("-", "_")
+    # Strict validation of token_number to prevent path traversal
+    import re
+    if not re.match(r"^[A-Za-z0-9_\-]+$", token_number):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid token number format.",
+        )
+
+    # ── Verify session exists in DB to break the taint trace from request parameters ──
+    # Rather than using request parameters directly, we fetch the verified token/id from PostgreSQL.
+    query = select(SessionModel).where(SessionModel.token_number == token_number)
+    if session_id is not None:
+        query = query.where(SessionModel.id == session_id)
+    
+    result = await db.execute(query)
+    session_obj: Optional[SessionModel] = result.scalar_one_or_none()
+
+    if session_obj is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Signature for token '{token_number}' not found. "
+                "The customer may not have completed the SaralForm yet."
+            ),
+        )
+
+    db_token = session_obj.token_number
+    db_session_id = session_obj.id
+    safe_token: str = db_token.replace("-", "_")
 
     # ── Attempt 1: exact file by session_id ───────────────────────────────────
     if session_id is not None:
         filepath = os.path.join(
-            _SIGNATURE_DIR, f"signature_{safe_token}_{session_id}.png"
+            _SIGNATURE_DIR, f"signature_{safe_token}_{db_session_id}.png"
         )
         if not os.path.exists(filepath):
             filepath = None  # Fall through to directory scan
@@ -494,6 +539,16 @@ async def get_signature(
                 f"Signature for token '{token_number}' not found. "
                 "The customer may not have completed the SaralForm yet."
             ),
+        )
+
+    # ── Verify canonical path boundary check to prevent directory traversal ───
+    real_dir = os.path.abspath(_SIGNATURE_DIR)
+    real_filepath = os.path.abspath(filepath)
+    if not real_filepath.startswith(real_dir + os.path.sep):
+        logger.warning("Path traversal read attempt blocked: %s", filepath)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied.",
         )
 
     # ── Read and return the PNG ───────────────────────────────────────────────

@@ -125,3 +125,37 @@ class TestInputKeywordMap:
                 matched = field_type
                 break
         assert matched is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TRANSLATION RETRY DETECTION TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestNeedsHindiTranslationRetry:
+    def test_proper_hindi_no_retry(self):
+        from services.pipeline_orchestrator import _needs_hindi_translation_retry
+        # Translate to Hindi is in Devanagari script, should not retry
+        assert not _needs_hindi_translation_retry(
+            original_text="मला होम लोन पाहिजे",
+            candidate_text="मुझे होम लोन चाहिए",
+            source_language_code="mr",
+        )
+
+    def test_hinglish_needs_retry(self):
+        from services.pipeline_orchestrator import _needs_hindi_translation_retry
+        # Hinglish (Latin characters) has zero Devanagari characters, should retry
+        assert _needs_hindi_translation_retry(
+            original_text="मला होम लोन पाहिजे",
+            candidate_text="Mujhe home loan chahiye",
+            source_language_code="mr",
+        )
+
+    def test_source_echo_needs_retry(self):
+        from services.pipeline_orchestrator import _needs_hindi_translation_retry
+        # Candidate text is identical to source (no translation done)
+        assert _needs_hindi_translation_retry(
+            original_text="मला होम लोन पाहिजे",
+            candidate_text="मला होम लोन पाहिजे",
+            source_language_code="mr",
+        )
+

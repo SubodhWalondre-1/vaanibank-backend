@@ -228,6 +228,18 @@ app = FastAPI(
 # ── Exception handlers (registered before middleware & routers) ───────────────
 register_exception_handlers(app)
 
+# ── Rate Limiting (AI endpoints — STT/LLM/TTS) ───────────────────────────────
+from middleware.rate_limit import RateLimitMiddleware
+
+app.add_middleware(
+    RateLimitMiddleware,
+    max_requests=30,
+    window_seconds=60,
+)
+
+# ── GZip Compression ──────────────────────────────────────────────────────────
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 _allowed_origins: list[str] = [
     o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()
@@ -241,18 +253,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
-
-# ── Rate Limiting (AI endpoints — STT/LLM/TTS) ───────────────────────────────
-from middleware.rate_limit import RateLimitMiddleware
-
-app.add_middleware(
-    RateLimitMiddleware,
-    max_requests=30,
-    window_seconds=60,
-)
-
-# ── GZip Compression ──────────────────────────────────────────────────────────
-app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # ── Static file mounts ────────────────────────────────────────────────────────
 
@@ -413,11 +413,12 @@ def _redact_url(url: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    dev_mode = settings.APP_ENV == "development"
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="127.0.0.1" if dev_mode else "0.0.0.0",
         port=int(settings.APP_PORT),
-        reload=settings.APP_ENV == "development",
+        reload=dev_mode,
         log_level="info",
         ws_ping_interval=20,
         ws_ping_timeout=20,
