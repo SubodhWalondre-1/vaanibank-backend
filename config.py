@@ -8,8 +8,12 @@ Import the singleton `settings` object wherever config is needed.
 
 from __future__ import annotations
 
+import os
+# Neutralise PGSSLMODE if set to an incompatible value in the environment (e.g. 'true')
+os.environ.pop("PGSSLMODE", None)
+
 from functools import lru_cache
-from typing import List
+from typing import List, Any
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -150,6 +154,34 @@ class Settings(BaseSettings):
     )
 
     # ── Derived helpers ───────────────────────────────────
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def clean_database_url(cls, v: str) -> str:
+        # Strip any quotes that might have been wrapped around the secret value in the environment
+        v = v.strip("'\"").strip()
+        # Strip sslmode query parameter if it exists because asyncpg does not support it
+        if "?" in v:
+            base, query = v.split("?", 1)
+            from urllib.parse import parse_qsl, urlencode
+            params = dict(parse_qsl(query))
+            if "sslmode" in params:
+                params.pop("sslmode")
+            if "neon.tech" in base:
+                params["ssl"] = "require"
+            if params:
+                v = f"{base}?{urlencode(params)}"
+            else:
+                v = base
+        else:
+            if "neon.tech" in v:
+                v = f"{v}?ssl=require"
+        return v
+
+    @field_validator("REDIS_URL")
+    @classmethod
+    def clean_redis_url(cls, v: str) -> str:
+        return v.strip("'\"").strip()
+
     @field_validator("APP_ENV")
     @classmethod
     def validate_app_env(cls, v: str) -> str:
@@ -157,6 +189,19 @@ class Settings(BaseSettings):
         if v not in allowed:
             raise ValueError(f"APP_ENV must be one of {allowed}, got '{v}'")
         return v
+
+    @field_validator("APP_PORT", mode="before")
+    @classmethod
+    def load_port_from_env(cls, v: Any) -> Any:
+        # Prioritize standard PORT env var set by hosting providers like Render
+        port_env = os.environ.get("PORT")
+        if port_env:
+            try:
+                return int(port_env)
+            except ValueError:
+                pass
+        return v
+
 
     @property
     def allowed_origins_list(self) -> List[str]:

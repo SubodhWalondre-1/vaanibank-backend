@@ -298,6 +298,13 @@ app.include_router(staff_router)        # /staff/*  /admin/*  /analytics/branch/
 app.include_router(forms_router)        # /forms/submit  /forms/signature/{token}  ← SaralForm
 
 
+@app.get("/", summary="Root entrypoint", tags=["health"])
+@app.head("/", summary="Root health check", tags=["health"])
+async def root_ping() -> dict:
+    """Return a simple welcome response for health checks and load balancers."""
+    return {"status": "ok", "app": "VaaniBank AI Backend", "version": "1.0.0"}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HEALTH ENDPOINTS
 # ══════════════════════════════════════════════════════════════════════════════

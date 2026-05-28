@@ -56,5 +56,6 @@ boto3==1.34.115
 # chromadb: local persistent vector store (no external API, zero cost)
 # rank-bm25: BM25 keyword search for exact banking term matching (CIBIL, PMJDY etc.)
 chromadb==0.5.3
+posthog<6.0.0
 rank-bm25==0.2.2
 

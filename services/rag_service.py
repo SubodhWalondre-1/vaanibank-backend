@@ -31,6 +31,7 @@ Usage:
 from __future__ import annotations
 
 import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 import asyncio
 import logging
 import re
@@ -281,18 +282,18 @@ class RAGService:
         Returns:
             RetrievalResult containing ranked chunks ready for LLM injection.
         """
-        if not self._ready:
-            await self.ensure_ready()
-
-        # If dependencies are missing, return empty result gracefully
-        if not _CHROMA_AVAILABLE or not _ST_AVAILABLE:
-            logger.warning("RAG dependencies missing — returning empty retrieval")
-            return RetrievalResult(
-                chunks=[], query_used=query,
-                retrieval_source="fallback", total_retrieved=0,
-            )
-
         try:
+            if not self._ready:
+                await self.ensure_ready()
+
+            # If dependencies are missing, return empty result gracefully
+            if not _CHROMA_AVAILABLE or not _ST_AVAILABLE:
+                logger.warning("RAG dependencies missing — returning empty retrieval")
+                return RetrievalResult(
+                    chunks=[], query_used=query,
+                    retrieval_source="fallback", total_retrieved=0,
+                )
+
             return await asyncio.to_thread(
                 self._retrieve_sync, query, intent, product, top_k
             )
@@ -404,33 +405,98 @@ class RAGService:
 
     def _get_embeddings_sync(self, texts: str | List[str], is_document: bool = False) -> List[float] | List[List[float]]:
         """
-        Fetch embeddings from Google Gemini API.
+        Fetch embeddings from Google Gemini API with exponential backoff retries on rate limits (429).
         """
         task_type = "retrieval_document" if is_document else "retrieval_query"
+        import time
+        import random
+
         try:
             if isinstance(texts, str):
-                res = genai.embed_content(
-                    model=_GEMINI_EMBED_MODEL,
-                    content=texts,
-                    task_type=task_type,
-                )
-                return res['embedding']
-            
+                max_retries = 5
+                base_delay = 1.5
+                for attempt in range(max_retries):
+                    try:
+                        res = genai.embed_content(
+                            model=_GEMINI_EMBED_MODEL,
+                            content=texts,
+                            task_type=task_type,
+                        )
+                        return res['embedding']
+                    except Exception as exc:
+                        exc_str = str(exc).lower()
+                        is_rate_limit = "429" in exc_str or "resource exhausted" in exc_str or "quota" in exc_str
+                        
+                        if is_rate_limit and attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt) + random.uniform(0.1, 0.5)
+                            logger.warning(
+                                "Gemini query embedding rate-limited (429). Retrying in %.2fs... Error: %s",
+                                delay, exc
+                            )
+                            time.sleep(delay)
+                        else:
+                            logger.error("Gemini query embedding failed: %s", exc)
+                            raise exc
+
             # Batch of texts
             all_embeddings = []
-            batch_size = 50
+            batch_size = 20  # Reduced from 50 to prevent hitting rate limits/token limits
+            
             for i in range(0, len(texts), batch_size):
                 batch = texts[i:i+batch_size]
-                res = genai.embed_content(
-                    model=_GEMINI_EMBED_MODEL,
-                    content=batch,
-                    task_type=task_type,
-                )
-                all_embeddings.extend(res['embedding'])
+                max_retries = 5
+                base_delay = 2.0
+                embedding_batch = None
+                
+                for attempt in range(max_retries):
+                    try:
+                        res = genai.embed_content(
+                            model=_GEMINI_EMBED_MODEL,
+                            content=batch,
+                            task_type=task_type,
+                        )
+                        embedding_batch = res['embedding']
+                        break
+                    except Exception as exc:
+                        exc_str = str(exc).lower()
+                        is_rate_limit = "429" in exc_str or "resource exhausted" in exc_str or "quota" in exc_str
+                        
+                        if is_rate_limit and attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt) + random.uniform(0.1, 1.0)
+                            logger.warning(
+                                "Gemini embedding 429 rate limit on batch %d/%d (attempt %d/%d). Retrying in %.2fs... Error: %s",
+                                i // batch_size + 1,
+                                (len(texts) + batch_size - 1) // batch_size,
+                                attempt + 1,
+                                max_retries,
+                                delay,
+                                exc
+                            )
+                            time.sleep(delay)
+                        else:
+                            logger.error(
+                                "Gemini embedding API call failed permanently on batch %d/%d (attempt %d/%d): %s",
+                                i // batch_size + 1,
+                                (len(texts) + batch_size - 1) // batch_size,
+                                attempt + 1,
+                                max_retries,
+                                exc
+                            )
+                            raise exc
+                            
+                if embedding_batch is None:
+                    raise RuntimeError("Failed to generate embeddings after retries")
+                all_embeddings.extend(embedding_batch)
+                
+                # Sleep briefly between batches to respect rate limits
+                if i + batch_size < len(texts):
+                    time.sleep(1.0)
+
             return all_embeddings
         except Exception as exc:
             logger.error("Gemini embedding API call failed: %s", exc)
             raise exc
+
 
     def _init_sync(self) -> None:
         """
@@ -441,33 +507,36 @@ class RAGService:
             logger.warning("RAG skipping init — required packages not installed")
             return
 
-        from config import settings
-        logger.info("Configuring RAG Gemini embedding model: %s", _GEMINI_EMBED_MODEL)
-        genai.configure(api_key=settings.GEMINI_API_KEY)
+        try:
+            from config import settings
+            logger.info("Configuring RAG Gemini embedding model: %s", _GEMINI_EMBED_MODEL)
+            genai.configure(api_key=settings.GEMINI_API_KEY)
 
-        # Connect to ChromaDB (creates DB if it does not exist)
-        _CHROMA_PATH.mkdir(parents=True, exist_ok=True)
-        self._chroma_client = chromadb.PersistentClient(
-            path=str(_CHROMA_PATH),
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-        self._collection = self._chroma_client.get_or_create_collection(
-            name=_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},   # cosine similarity for semantic search
-        )
-
-        # Auto-ingest if collection is empty (first run)
-        existing_count = self._collection.count()
-        if existing_count == 0:
-            logger.info("ChromaDB collection empty — running initial knowledge base ingestion")
-            self._ingest_sync(_KB_PATH)
-        else:
-            logger.info(
-                "ChromaDB collection loaded: %d chunks in '%s'",
-                existing_count, _COLLECTION_NAME,
+            # Connect to ChromaDB (creates DB if it does not exist)
+            _CHROMA_PATH.mkdir(parents=True, exist_ok=True)
+            self._chroma_client = chromadb.PersistentClient(
+                path=str(_CHROMA_PATH),
+                settings=ChromaSettings(anonymized_telemetry=False),
             )
-            # Rebuild BM25 index from existing ChromaDB data
-            self._rebuild_bm25_index()
+            self._collection = self._chroma_client.get_or_create_collection(
+                name=_COLLECTION_NAME,
+                metadata={"hnsw:space": "cosine"},   # cosine similarity for semantic search
+            )
+
+            # Auto-ingest if collection is empty (first run)
+            existing_count = self._collection.count()
+            if existing_count == 0:
+                logger.info("ChromaDB collection empty — running initial knowledge base ingestion")
+                self._ingest_sync(_KB_PATH)
+            else:
+                logger.info(
+                    "ChromaDB collection loaded: %d chunks in '%s'",
+                    existing_count, _COLLECTION_NAME,
+                )
+                # Rebuild BM25 index from existing ChromaDB data
+                self._rebuild_bm25_index()
+        except Exception as exc:
+            logger.error("RAG service initialization failed (non-fatal): %s", exc, exc_info=True)
 
     def _ingest_sync(self, kb_path: Path) -> int:
         """
@@ -536,7 +605,17 @@ class RAGService:
 
         # Embed all new chunks in one batch via Gemini API
         logger.info("Embedding %d new chunks via Gemini API...", len(new_ids))
-        embeddings = self._get_embeddings_sync(new_texts, is_document=True)
+        try:
+            embeddings = self._get_embeddings_sync(new_texts, is_document=True)
+        except Exception as exc:
+            logger.warning(
+                "Gemini embedding API failed during ingestion: %s — "
+                "falling back to dummy zero-vectors to enable local BM25 indexing.",
+                exc,
+            )
+            # Create a zero embedding for each new text chunk
+            # 768 is the default dimension for gemini-embedding-001
+            embeddings = [[0.0] * 768 for _ in range(len(new_ids))]
 
         # Store in ChromaDB in batches of 100 (ChromaDB recommendation)
         batch_size = 100
@@ -599,41 +678,51 @@ class RAGService:
             4. Reciprocal Rank Fusion to merge both ranked lists
             5. Return top_k chunks
         """
-        assert self._collection is not None, "collection not initialised"
+        if self._collection is None:
+            logger.warning("RAG collection is None (init failed) — returning empty hybrid retrieval")
+            return RetrievalResult(
+                chunks=[], query_used=query,
+                retrieval_source="fallback", total_retrieved=0,
+            )
 
         # --- Step 1: Build ChromaDB metadata filter ----------------------------
         # where clause narrows the HNSW ANN search to relevant intent/product docs
         where_clause = self._build_where_clause(intent, product)
 
         # --- Step 2: Dense vector retrieval ------------------------------------
-        query_embedding = self._get_embeddings_sync(query, is_document=False)
+        query_embedding = None
+        try:
+            query_embedding = self._get_embeddings_sync(query, is_document=False)
+        except Exception as exc:
+            logger.warning("Failed to generate query embedding (non-fatal, dense search skipped): %s", exc)
 
         dense_results: Dict[str, float] = {}   # chunk_id → similarity score
         dense_texts:   Dict[str, str]   = {}
         dense_meta:    Dict[str, Dict]  = {}
 
-        try:
-            n_dense = min(_DENSE_CANDIDATES, self._collection.count())
-            chroma_response = self._collection.query(
-                query_embeddings=[query_embedding],
-                n_results=max(1, n_dense),
-                where=where_clause if where_clause else None,
-                include=["documents", "metadatas", "distances"],
-            )
-            if chroma_response["ids"] and chroma_response["ids"][0]:
-                for cid, doc, meta, dist in zip(
-                    chroma_response["ids"][0],
-                    chroma_response["documents"][0],
-                    chroma_response["metadatas"][0],
-                    chroma_response["distances"][0],
-                ):
-                    # ChromaDB returns cosine distance (0 = identical); convert to similarity
-                    similarity = max(0.0, 1.0 - dist)
-                    dense_results[cid] = similarity
-                    dense_texts[cid]   = doc
-                    dense_meta[cid]    = meta
-        except Exception as exc:
-            logger.warning("Dense retrieval failed: %s", exc)
+        if query_embedding is not None:
+            try:
+                n_dense = min(_DENSE_CANDIDATES, self._collection.count())
+                chroma_response = self._collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=max(1, n_dense),
+                    where=where_clause if where_clause else None,
+                    include=["documents", "metadatas", "distances"],
+                )
+                if chroma_response["ids"] and chroma_response["ids"][0]:
+                    for cid, doc, meta, dist in zip(
+                        chroma_response["ids"][0],
+                        chroma_response["documents"][0],
+                        chroma_response["metadatas"][0],
+                        chroma_response["distances"][0],
+                    ):
+                        # ChromaDB returns cosine distance (0 = identical); convert to similarity
+                        similarity = max(0.0, 1.0 - dist)
+                        dense_results[cid] = similarity
+                        dense_texts[cid]   = doc
+                        dense_meta[cid]    = meta
+            except Exception as exc:
+                logger.warning("Dense retrieval failed: %s", exc)
 
         # --- Step 3: BM25 keyword retrieval ------------------------------------
         bm25_results: Dict[str, float] = {}   # chunk_id → BM25 score
