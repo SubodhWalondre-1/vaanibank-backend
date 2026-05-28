@@ -37,10 +37,13 @@ _AADHAAR_LABELS = {
 
 _PAN_LABELS = {
     "hi": "पैन कार्ड", "mr": "पॅन कार्ड", "ta": "பான் अட்டை",
-    "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾൻ ಕಾರ್ಡ್",
+    "te": "పాన్ కార్డ్", "bn": "প্যান কার্ড", "kn": "ಪ್ಯಾನ್ ಕಾರ್ಡ್",
     "or": "ପ୍ୟାନ କାର୍ଡ", "pa": "ਪੈਨ ਕਾਰਡ", "gu": "પાન કાર્ડ",
     "ml": "പാൻ കാർഡ്",
 }
+
+_AADHAAR_LABEL_EN = "Aadhaar Card"
+_PAN_LABEL_EN = "PAN Card"
 
 
 DOCUMENT_REGISTRY: dict = {
@@ -50,7 +53,7 @@ DOCUMENT_REGISTRY: dict = {
     "account_opening": [
         {
             "id": "aadhaar",
-            "label_en": "Aadhaar Card",
+            "label_en": _AADHAAR_LABEL_EN,
             "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
@@ -58,7 +61,7 @@ DOCUMENT_REGISTRY: dict = {
         },
         {
             "id": "pan",
-            "label_en": "PAN Card",
+            "label_en": _PAN_LABEL_EN,
             "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required",
@@ -99,7 +102,7 @@ DOCUMENT_REGISTRY: dict = {
     "loan_enquiry": [
         {
             "id": "aadhaar",
-            "label_en": "Aadhaar Card",
+            "label_en": _AADHAAR_LABEL_EN,
             "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
@@ -107,7 +110,7 @@ DOCUMENT_REGISTRY: dict = {
         },
         {
             "id": "pan",
-            "label_en": "PAN Card",
+            "label_en": _PAN_LABEL_EN,
             "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required",
@@ -239,7 +242,7 @@ DOCUMENT_REGISTRY: dict = {
     "fixed_deposit": [
         {
             "id": "aadhaar",
-            "label_en": "Aadhaar Card",
+            "label_en": _AADHAAR_LABEL_EN,
             "labels": _AADHAAR_LABELS,
             "required": True,
             "tag": "Required",
@@ -247,7 +250,7 @@ DOCUMENT_REGISTRY: dict = {
         },
         {
             "id": "pan",
-            "label_en": "PAN Card",
+            "label_en": _PAN_LABEL_EN,
             "labels": _PAN_LABELS,
             "required": True,
             "tag": "Required — TDS 20% without PAN",
