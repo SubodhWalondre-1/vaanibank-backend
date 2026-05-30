@@ -204,13 +204,12 @@ def _try_register_fonts(force: bool = False) -> None:
     if reg:
         try:
             pdfmetrics.registerFont(TTFont("NotoDevanagari", reg))
-            _FONT_HINDI = _FONT_REGULAR = _FONT_CUST = "NotoDevanagari"
+            _FONT_HINDI = "NotoDevanagari"
         except Exception as exc:
             logger.warning("NotoDevanagari register failed: %s", exc)
     if bold:
         try:
             pdfmetrics.registerFont(TTFont("NotoDevanagari-Bold", bold))
-            _FONT_BOLD = "NotoDevanagari-Bold"
         except Exception as exc:
             logger.warning("NotoDevanagari-Bold register failed: %s", exc)
 
@@ -585,7 +584,7 @@ def _make_heading_html(section_key: str, customer_language: str, customer_font: 
     trans_hi = _HEADING_TRANSLATIONS.get(section_key, _HEADING_TRANSLATIONS["key_points"])["hindi"]
     trans_cust = _HEADING_TRANSLATIONS.get(section_key, _HEADING_TRANSLATIONS["key_points"]).get(lang_clean, "")
 
-    font_hi = _FONT_BOLD if "NotoDevanagari" in _FONT_BOLD else "Helvetica-Bold"
+    font_hi = "NotoDevanagari-Bold" if _FONT_HINDI == "NotoDevanagari" else "Helvetica-Bold"
     font_cust = customer_font if customer_font else "Helvetica-Bold"
 
     en_block = f'<font name="Helvetica-Bold">{trans_en}</font>'
@@ -605,7 +604,7 @@ def _make_form_title_html(intent: Optional[str], customer_language: str, custome
     trans_hi = _FORM_NAME_TRANSLATIONS.get(key, _FORM_NAME_TRANSLATIONS["general"])["hindi"]
     trans_cust = _FORM_NAME_TRANSLATIONS.get(key, _FORM_NAME_TRANSLATIONS["general"]).get(lang_clean, "")
 
-    font_hi = _FONT_BOLD if "NotoDevanagari" in _FONT_BOLD else "Helvetica-Bold"
+    font_hi = "NotoDevanagari-Bold" if _FONT_HINDI == "NotoDevanagari" else "Helvetica-Bold"
     font_cust = customer_font if customer_font else "Helvetica-Bold"
 
     en_block = f'<font name="Helvetica-Bold">{trans_en}</font>'
@@ -616,6 +615,76 @@ def _make_form_title_html(intent: Optional[str], customer_language: str, custome
         return f"{en_block}  /  {hi_block}  /  {cust_block}"
     else:
         return f"{en_block}  /  {hi_block}"
+
+_HEADER_TRANSLATIONS = {
+    "field": {
+        "english": "Field",
+        "hindi": "फ़ील्ड",
+        "marathi": "फ़ील्ड",
+        "tamil": "புலம்",
+        "telugu": "ఫీల్డ్",
+        "bengali": "ক্ষেত্র",
+        "kannada": "ಕ್ಷೇತ್ರ",
+        "odia": "କ୍ଷେତ୍ର",
+        "punjabi": "ਖੇਤਰ",
+        "gujarati": "ક્ષેત્ર",
+        "malayalam": "മേખല"
+    },
+    "value": {
+        "english": "Value",
+        "hindi": "डेटा",
+        "marathi": "डेटा",
+        "tamil": "மதிப்பு",
+        "telugu": "విలువ",
+        "bengali": "मान",
+        "kannada": "ಮೌಲ್ಯ",
+        "odia": "ମୂଲ୍ୟ",
+        "punjabi": "ମੁੱਲ",
+        "gujarati": "મૂલ્ય",
+        "malayalam": "മൂല്യം"
+    }
+}
+
+def _make_table_header_html(header_key: str, customer_language: str, customer_font: str) -> str:
+    lang_clean = customer_language.lower().strip()
+    trans_en = _HEADER_TRANSLATIONS.get(header_key, {})["english"]
+    trans_hi = _HEADER_TRANSLATIONS.get(header_key, {})["hindi"]
+    trans_cust = _HEADER_TRANSLATIONS.get(header_key, {}).get(lang_clean, "")
+
+    font_hi = "NotoDevanagari-Bold" if _FONT_HINDI == "NotoDevanagari" else "Helvetica-Bold"
+    font_cust = customer_font if customer_font else "Helvetica-Bold"
+
+    en_block = f'<font name="Helvetica-Bold">{trans_en}</font>'
+    hi_block = f'<font name="{font_hi}">{trans_hi}</font>'
+
+    if trans_cust and trans_cust != trans_hi and lang_clean != "hindi" and lang_clean != "english":
+        cust_block = f'<font name="{font_cust}">{trans_cust}</font>'
+        return f"{en_block}  /  {hi_block}  /  {cust_block}"
+    else:
+        return f"{en_block}  /  {hi_block}"
+
+def _make_field_label_html(display_key: str) -> str:
+    """Format field key with proper bilingual fonts so that English shows in Helvetica-Bold and Hindi in Devanagari."""
+    if " / " in display_key:
+        parts = display_key.split(" / ")
+        if len(parts) == 2:
+            eng_part, cust_part = parts
+            font_hi = "NotoDevanagari-Bold" if _FONT_HINDI == "NotoDevanagari" else "Helvetica-Bold"
+            return f'<font name="Helvetica-Bold">{eng_part}</font>  /  <font name="{font_hi}">{cust_part}</font>'
+    return f'<font name="Helvetica-Bold">{display_key}</font>'
+
+def _wrap_value_html(val_str: str, customer_font: str) -> str:
+    """Wrap value text in appropriate font to support regional characters if present."""
+    has_non_ascii = any(ord(c) > 127 for c in val_str)
+    if has_non_ascii:
+        font = customer_font if customer_font else "NotoDevanagari"
+        return f'<font name="{font}">{val_str}</font>'
+    else:
+        return f'<font name="Helvetica-Bold">{val_str}</font>'
+
+def _make_bilingual_label_html(eng_text: str, hi_text: str) -> str:
+    font_hi = "NotoDevanagari-Bold" if _FONT_HINDI == "NotoDevanagari" else "Helvetica-Bold"
+    return f'<font name="Helvetica-Bold">{eng_text}</font>  /  <font name="{font_hi}">{hi_text}</font>'
 
 
 # PDF SERVICE
@@ -810,9 +879,11 @@ class PDFService:
             elements.append(Paragraph("No form data collected during this session.", st["meta_value"]))
         else:
             # Table Header
+            field_header_html = _make_table_header_html("field", customer_language, customer_font)
+            value_header_html = _make_table_header_html("value", customer_language, customer_font)
             table_data = [[
-                Paragraph("<b>Field / फ़ील्ड</b>", st["meta_label"]),
-                Paragraph("<b>Value / डेटा</b>", st["meta_label"])
+                Paragraph(field_header_html, st["meta_label"]),
+                Paragraph(value_header_html, st["meta_label"])
             ]]
 
             # Table Rows
@@ -917,9 +988,11 @@ class PDFService:
                 if val is None or val == "": continue
                 
                 display_key = field_map.get(key, key.replace("_", " ").title())
+                display_key_html = _make_field_label_html(display_key)
+                val_html = _wrap_value_html(str(val), customer_font)
                 table_data.append([
-                    Paragraph(display_key, st["meta_value"]),
-                    Paragraph(str(val), st["meta_value"])
+                    Paragraph(display_key_html, st["meta_value"]),
+                    Paragraph(val_html, st["meta_value"])
                 ])
 
             # Create Table
@@ -949,7 +1022,8 @@ class PDFService:
         sig_path = Path(__file__).resolve().parent.parent / "storage" / "signatures" / sig_filename
         
         if sig_path.is_file():
-            elements.append(Paragraph("<b>Digital Signature / डिजिटल हस्ताक्षर:</b>", st["meta_label"]))
+            sig_label_html = _make_bilingual_label_html("Digital Signature", "डिजिटल हस्ताक्षर:")
+            elements.append(Paragraph(sig_label_html, st["meta_label"]))
             elements.append(Spacer(1, 2 * mm))
             # Wrap image in a small table for border/styling
             img = Image(str(sig_path), width=120, height=60)

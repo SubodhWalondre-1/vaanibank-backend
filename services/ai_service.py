@@ -1074,6 +1074,79 @@ class AIService:
         return None
 
 
+    _BANKING_TRANSLATIONS: Dict[str, str] = {
+        # Greeting scripts
+        "नमस्ते, Union Bank of India में आपका स्वागत है। मैं आपकी क्या मदद कर सकता हूँ?": "Hello, welcome to Union Bank of India. How can I help you?",
+        "जी बिल्कुल, लोन के बारे में मैं आपकी पूरी मदद करूंगा। कुछ जानकारी लेनी होगी।": "Sure, I will assist you with the loan. I will need to gather some information.",
+        "जी हाँ, खाता खोलने में मैं आपकी मदद करता हूँ। कुछ details चाहिए होंगे।": "Yes, I will help you with opening an account. Some details will be required.",
+        "KYC update के लिए आ गए हैं? बिल्कुल सही, मैं अभी कर देता हूँ।": "Have you come for a KYC update? Certainly, I will process it right now.",
+        "FD करना चाहते हैं? बहुत अच्छा! कुछ जानकारी लेता हूँ।": "Do you want to create a Fixed Deposit? That's great! Let me take some details.",
+        "Card से related समस्या है? मैं अभी solve करता हूँ।": "Is it a card-related issue? I will resolve it right away.",
+        "Balance check करना है? जी बिल्कुल, verification करता हूँ।": "Do you want to check your balance? Sure, let me perform the verification.",
+        
+        # Farewell scripts
+        "आपका काम हो गया है। कोई और मदद चाहिए तो बताइए। धन्यवाद!": "Your request is completed. Let me know if you need any other help. Thank you!",
+        "आपकी loan application की सारी जानकारी ले ली है। Processing शुरू हो जाएगी। धन्यवाद!": "All information for your loan application has been gathered. Processing will begin. Thank you!",
+        "आपका खाता खोलने की सारी details ले ली हैं। Account जल्द active हो जाएगा। धन्यवाद!": "All details for opening your account have been gathered. The account will be activated soon. Thank you!",
+        "आपका KYC update हो गया है। कोई और मदद चाहिए तो बताइए।": "Your KYC has been updated. Please let me know if you need any other help.",
+        "आपकी FD की सारी details ले ली हैं। FD जल्द open हो जाएगी। धन्यवाद!": "All details for your Fixed Deposit have been gathered. It will be opened soon. Thank you!",
+        "Card की समस्या solve हो गई है। कोई और मदद चाहिए तो बताइए।": "The card issue has been resolved. Let know if you need any other help.",
+        "Balance enquiry complete हो गई है। धन्यवाद!": "Balance enquiry is complete. Thank you!",
+
+        # Predefined questions (loan_enquiry)
+        "आपका शुभ नाम क्या है?": "What is your full name?",
+        "आपको कौन सा लोन चाहिए — Home, Personal, Education, या Vehicle?": "Which loan do you want — Home, Personal, Education, or Vehicle?",
+        "आपको कितनी राशि का लोन चाहिए?": "How much loan amount do you need?",
+        "आपकी monthly income कितनी है?": "What is your monthly income?",
+        "आप Salaried हैं, Self-employed, या Business करते हैं?": "Are you Salaried, Self-employed, or running a Business?",
+        "कितने साल या महीने का लोन चाहिए?": "What loan tenure do you want (years or months)?",
+        "आपकी उम्र कितनी है?": "How old are you?",
+        "क्या आपका CIBIL score पता है?": "Do you know your CIBIL score?",
+        "अभी कोई और loan EMI चल रही है क्या?": "Are you currently paying any other loan EMIs?",
+        "यह लोन किस काम के लिए चाहिए?": "What is the purpose of this loan?",
+        "क्या आप Aadhaar card लाए हैं?": "Have you brought your Aadhaar card?",
+        "क्या आपके पास PAN card है?": "Do you have a PAN card?",
+
+        # Predefined questions (account_opening)
+        "कौन सा खाता चाहिए — Savings, Current, या Jan Dhan?": "Which account do you want to open — Savings, Current, or Jan Dhan?",
+        "यह खाता किस काम के लिए चाहिए?": "What is the purpose of this account?",
+        "खाता खोलने के लिए कितनी राशि जमा कराएंगे?": "How much initial deposit will you make to open the account?",
+        "खाते में nominee किसका नाम रखना है?": "Whom do you want to name as the nominee for the account?",
+        "आपका registered mobile number क्या है?": "What is your registered mobile number?",
+        "क्या आपके पास address proof है — utility bill या Aadhaar?": "Do you have address proof — a utility bill or Aadhaar?",
+        "क्या आप 2 passport size photos लाए हैं?": "Have you brought 2 passport size photographs?",
+        "क्या आप Jan Dhan (zero balance) खाता खोलना चाहते हैं?": "Do you want to open a Jan Dhan (zero balance) account?",
+
+        # Predefined questions (kyc_update)
+        "क्या update करना है — address, mobile, Aadhaar seeding, या nominee?": "What do you want to update — address, mobile, Aadhaar seeding, or nominee?",
+        "क्या आपका Aadhaar bank account से link है?": "Is your Aadhaar linked with your bank account?",
+        "क्या आपके पास नया address proof है?": "Do you have a new address proof?",
+        "नया address kya है?": "What is the new address?",
+        "क्या आपका mobile number account से link है?": "Is your mobile number linked to the account?",
+        "आपका re-KYC कब तक करना है?": "When is your re-KYC due?",
+
+        # Predefined questions (fixed_deposit)
+        "FD में कितनी राशि जमा कराना चाहते हैं?": "How much amount do you want to deposit in the FD?",
+        "कितने समय के लिए FD करना है?": "What is the tenure for the FD?",
+        "Regular FD चाहिए या Sweep-in FD?": "Do you want a Regular FD or a Sweep-in FD?",
+        "क्या आप 60 साल या उससे ज़्यादा हैं? (extra rate मिलेगा)": "Are you 60 years or older? (You will get an extra interest rate)",
+        "क्या आपकी income taxable नहीं है? (Form 15G/H चाहिए)": "Is your income non-taxable? (Form 15G/H required)",
+
+        # Predefined questions (card_services)
+        "कौन सा card है — RuPay, VISA, या Mastercard?": "Which card do you have — RuPay, VISA, or Mastercard?",
+        "Card के साथ क्या problem है?": "What is the issue with your card?",
+        "Card क्यूँ block करना है — खोया, चोरी, या damaged?": "Why do you want to block the card — lost, stolen, or damaged?",
+        "PIN भूल गए हैं या PIN reset करना है?": "Have you forgotten your PIN or do you want to reset it?",
+
+        # Predefined questions (balance_enquiry)
+        "आपका account number क्या है?": "What is your account number?",
+        "Identity verify करने के लिए DOB या OTP बताइए": "Please provide your Date of Birth or OTP to verify your identity.",
+
+        # Predefined questions (general)
+        "आज आप किस काम से आए हैं?": "What brings you to the bank today?",
+        "आपका mobile number क्या है?": "What is your mobile number?",
+    }
+
     async def translate_to_english(self, text: str) -> str:
         """
         Translate any Indian language text to English using the shared
@@ -1084,6 +1157,12 @@ class AIService:
         if not text or not text.strip():
             return "—"
 
+        # Check standard translations dictionary first (zero-latency, offline friendly)
+        normalized_text = text.strip()
+        if normalized_text in self._BANKING_TRANSLATIONS:
+            return self._BANKING_TRANSLATIONS[normalized_text]
+
+        # Primary translation channel: Groq LLaMA
         try:
             completion = await self._call_groq_with_fallback(
                 model=settings.GROQ_MODEL,
@@ -1102,10 +1181,31 @@ class AIService:
                 max_tokens=200,
                 timeout=15.0,
             )
-            return (completion.choices[0].message.content or "").strip() or text
+            result = (completion.choices[0].message.content or "").strip()
+            if result:
+                return result
         except Exception as exc:
-            logger.warning("translate_to_english failed: %s", exc)
-            return text  # graceful fallback
+            logger.warning("Groq translate_to_english failed: %s — trying Gemini fallback", exc)
+
+        # Fallback translation channel: Gemini
+        if self._gemini_model is not None:
+            try:
+                gemini_prompt = (
+                    "SYSTEM INSTRUCTIONS:\n"
+                    "You are a professional bank translator. Translate the given Hindi/Indian language banking text to English. "
+                    "Return ONLY the English translation, nothing else. No explanations, no quotes.\n\n"
+                    f"TEXT: {text}"
+                )
+                gemini_response = await asyncio.to_thread(
+                    self._gemini_model.generate_content, gemini_prompt
+                )
+                result = (gemini_response.text or "").strip()
+                if result:
+                    return result
+            except Exception as gemini_exc:
+                logger.warning("Gemini translate_to_english fallback failed: %s", gemini_exc)
+
+        return text  # final graceful fallback
 
 
 # Module-level singleton

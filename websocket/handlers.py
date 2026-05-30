@@ -428,21 +428,172 @@ class HandlersMixin:
                 # Load KB
                 rag_context = await _load_ubi_knowledge_base(intent=pre_intent)
 
-                result = await ai_service.process_with_llm(
-                    text=customer_text,
-                    source_language=session_obj.customer_language or "Marathi",
-                    detected_intent=pre_intent,
-                    conversation_history=history,
-                    rag_context=rag_context,
-                )
+                try:
+                    result = await ai_service.process_with_llm(
+                        text=customer_text,
+                        source_language=session_obj.customer_language or "Marathi",
+                        detected_intent=pre_intent,
+                        conversation_history=history,
+                        rag_context=rag_context,
+                    )
+                    suggested_hi = result.suggested_response_hindi
+                    suggested_cust = result.suggested_response_customer_lang
+                    intent_val = result.intent or pre_intent or "general"
+                    proc_val = result.process_triggered
+                except Exception as llm_exc:
+                    logger.warning(
+                        "LLM processing failed in suggestion regeneration. Falling back to deterministic navigator. error=%s",
+                        llm_exc,
+                    )
+                    import time
+                    from core.language import LANG_NAME_TO_CODE
+                    from services.ai_service import _WAIT_PHRASES
+                    from services.session_navigator import compute_next_actions, GREETING_MULTILINGUAL, FAREWELL_MULTILINGUAL
+
+                    intent_val = pre_intent or "general"
+                    proc_val = None
+                    lang_name = session_obj.customer_language or "Marathi"
+                    lang_code = LANG_NAME_TO_CODE.get(lang_name.lower(), "hi")
+
+                    # Generate dynamic fallback alternates
+                    use_alt = (int(time.time()) % 2 == 0)
+
+                    doc_score = 0
+                    if intent_val != "general":
+                        from services.document_service import compute_readiness
+                        try:
+                            readiness = compute_readiness(intent_val, session_obj.collected_data or {})
+                            doc_score = readiness.get("score", 0)
+                        except Exception:
+                            pass
+
+                    nav_state = compute_next_actions(
+                        intent=intent_val,
+                        collected_info=session_obj.collected_data or {},
+                        doc_readiness_score=doc_score,
+                        conversation_stage="exploring",
+                        exchange_count=session_obj.total_exchanges or 0,
+                    )
+
+                    next_q = nav_state.get("next_question")
+
+                    # We define localized fallback queries inline to keep it self-contained
+                    fallback_phrases = {
+                        "customer_name": {
+                            "hi": "आपका शुभ नाम क्या है?",
+                            "mr": "तुमचे पूर्ण नाव काय आहे?",
+                            "ta": "உங்கள் பெயர் என்ன?",
+                            "te": "మీ పేరు ఏమిటి?",
+                            "bn": "আপনার নাম কী?",
+                            "kn": "ನಿಮ್ಮ ಹೆಸರು ಏನು?",
+                            "or": "ଆପଣଙ୍କ ନାମ କଣ?",
+                            "pa": "ਤੁਹਾਡਾ ਨਾਮ ਕੀ ਹੈ?",
+                            "gu": "તમારું નામ શું છે?",
+                            "ml": "നിങ്ങളുടെ പേര് എന്താണ്?",
+                            "en": "What is your full name?",
+                        },
+                        "amount": {
+                            "hi": "आपको कितनी राशि चाहिए?",
+                            "mr": "तुम्हाला किती रक्कम हवी आहे?",
+                            "ta": "உங்களுக்கு எவ்வளவு தொகை வேண்டும்?",
+                            "te": "మీకు ఎంత డబ్బు కావాలి?",
+                            "bn": "আপনার কত টাকা প্রয়োজন?",
+                            "kn": "ನಿಮಗೆ ಎಷ್ಟು ಹಣ ಬೇಕು?",
+                            "or": "ଆପଣଙ୍କର କେତେ ଟଙ୍କା ଆବଶ୍ୟକ?",
+                            "pa": "ਤੁਹਾਨੂੰ ਕਿੰਨੀ ਰਕਮ ਚਾਹੀਦੀ ਹੈ?",
+                            "gu": "તમારે કેટલી રકમની જરૂર છે?",
+                            "ml": "നിങ്ങൾക്ക് എത്ര തുക വേണം?",
+                            "en": "How much amount do you require?",
+                        },
+                        "monthly_income": {
+                            "hi": "आपकी मासिक आय कितनी है?",
+                            "mr": "तुमचे मासिक उत्पन्न किती आहे?",
+                            "ta": "உங்கள் மாத வருமானம் எவ்வளவு?",
+                            "te": "మీ నెలవారీ ఆదాయம் ఎంత?",
+                            "bn": "আপনার মাসিক আয় কত?",
+                            "kn": "ನಿಮ್ಮ ಮಾಸಿಕ ಆದಾಯ ಎಷ್ಟು?",
+                            "or": "ଆପଣଙ୍କର ମାସିକ ଆୟ କେତେ?",
+                            "pa": "ਤੁਹਾਡੀ ਮਹੀਨਾਵਾਰ ਆਮਦਨ ਕਿੰની है?",
+                            "gu": "તમારી માસિક આવક કેટલી છે?",
+                            "ml": "നിങ്ങളുടെ പ്രതിമാസ വരുമാനം എത്രയാണ്?",
+                            "en": "What is your monthly income?",
+                        },
+                        "loan_type": {
+                            "hi": "आपको कौन सा लोन चाहिए?",
+                            "mr": "तुम्हाला कोणत्या प्रकारचा कर्ज हवा आहे?",
+                            "ta": "உங்களுக்கு என்ன வகையான கடன் வேண்டும்?",
+                            "te": "మీకు ఏ రకమైన రుణం కావాలి?",
+                            "bn": "আপনার কী ধরণের ঋণ প্রয়োজন?",
+                            "kn": "ನಿಮಗೆ ಯಾವ ರೀತಿಯ ಸಾಲ ಬೇಕು?",
+                            "or": "ଆପଣଙ୍କୁ କେଉଁ ପ୍ରକାରର ଋଣ ଆବଶ୍ୟक?",
+                            "pa": "ਤੁਹਾਨੂੰ ਕਿਸ ਤਰ੍ਹਾਂ ਦਾ ਕਰਜ਼ਾ ਚਾਹੀਦਾ ਹੈ?",
+                            "gu": "તમારે કયા પ્રકારની લોન જોઈએ છે?",
+                            "ml": "നിങ്ങൾക്ക് ഏത് തരത്തിലുള്ള വായ്പയാണ് വേണ്ടത്?",
+                            "en": "What type of loan do you need?",
+                        },
+                        "account_type": {
+                            "hi": "आप कौन सा खाता खोलना चाहते हैं?",
+                            "mr": "तुम्हाला कोणते खाते उघडायचे आहे?",
+                            "ta": "நீங்கள் என்ன கணக்கு தொடங்க விரும்புகிறீர்கள்?",
+                            "te": "మీరు ఏ ఖాతా తెరవాలనుకుంటున్నారు?",
+                            "bn": "আপনি কী ধরণের অ্যাকাউন্ট খুলতে চান?",
+                            "kn": "ನೀವು ಯಾವ ಖಾತೆಯನ್ನು ತೆರೆಯಲು ಬಯಸುತ್ತೀರಿ?",
+                            "or": "ଆପଣ କେଉଁ ପ୍ରକାରର ଖାતા ଖୋଲିବାକୁ ଚାହୁଁଛନ୍ତି?",
+                            "pa": "ਤੁਸੀਂ ਕਿਹੜਾ ਖਾਤਾ ਖੋਲ੍ਹਣਾ ਚਾਹੁੰਦੇ ਹੋ?",
+                            "gu": "તમે કયું ખાતું ખોલવા માંગો છો?",
+                            "ml": "നിങ്ങൾ ഏത് അക്കൗണ്ടാണ് തുറക്കാൻ ആഗ്രഹിക്കുന്നത്?",
+                            "en": "Which type of account do you want to open?",
+                        },
+                        "purpose": {
+                            "hi": "इसका उद्देश्य क्या है?",
+                            "mr": "याचे कारण किंवा उद्देश काय आहे?",
+                            "ta": "இதன் நோக்கம் என்ன?",
+                            "te": "దీని ఉద్దేశం ఏమిటి?",
+                            "bn": "এর উদ্দেশ্য কী?",
+                            "kn": "ಇದರ ಉದ್ದೇಶ ಏನು?",
+                            "or": "ଏହାର ଉଦ୍ଦେଶ୍ୟ କଣ?",
+                            "pa": "ਇਸਦਾ ਉਦੇਸ਼ ਕੀ ਹੈ?",
+                            "gu": "આનો હેતુ શું છે?",
+                            "ml": "ഇതിന്റെ ലക്ഷ്യം എന്താണ്?",
+                            "en": "What is the purpose of this request?",
+                        },
+                    }
+
+                    if use_alt:
+                        suggested_hi = "कृपया एक क्षण रुकें, मैं अभी आगे की प्रक्रिया पूरी करता हूँ।"
+                        suggested_cust = _WAIT_PHRASES.get(lang_code) or _WAIT_PHRASES["hi"]
+                    elif next_q:
+                        lbl = next_q.get("label", "")
+                        q_hi = next_q.get("question_hi", "")
+                        suggested_hi = f"जी हाँ, प्रक्रिया शुरू करने के लिए मुझे आपका {lbl} चाहिए। {q_hi}"
+                        
+                        try:
+                            # Try translating to customer language
+                            translated = await ai_service.translate_text(
+                                text=suggested_hi,
+                                target_language_code=lang_code,
+                                source_language_code="hi",
+                            )
+                            suggested_cust = translated or q_hi
+                        except Exception:
+                            field_key = next_q.get("key", "")
+                            suggested_cust = fallback_phrases.get(field_key, {}).get(lang_code) or GREETING_MULTILINGUAL.get(lang_code) or q_hi
+                    else:
+                        is_close_phase = nav_state.get("phase") in ("close", "process")
+                        if is_close_phase:
+                            suggested_hi = nav_state.get("farewell_script") or "जी, आपकी सारी जानकारी मिल गई है। धन्यवाद!"
+                            suggested_cust = FAREWELL_MULTILINGUAL.get(lang_code) or suggested_hi
+                        else:
+                            suggested_hi = nav_state.get("greeting_script") or "नमस्ते, मैं आपकी क्या मदद कर सकता हूँ?"
+                            suggested_cust = GREETING_MULTILINGUAL.get(lang_code) or suggested_hi
 
                 # 3. Broadcast new suggestion
                 await self.broadcast_suggestion(
                     token_number=token_number,
-                    suggested_hindi=result.suggested_response_hindi,
-                    suggested_customer_lang=result.suggested_response_customer_lang,
-                    intent=result.intent,
-                    process_triggered=result.process_triggered,
+                    suggested_hindi=suggested_hi,
+                    suggested_customer_lang=suggested_cust,
+                    intent=intent_val,
+                    process_triggered=proc_val,
                     exchange_id=last_exchange.id,
                 )
 
