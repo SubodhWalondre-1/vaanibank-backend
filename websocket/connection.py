@@ -214,7 +214,7 @@ class ConnectionMixin:
         """
         try:
             # Small delay to let WebSocket handshake settle
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(0.05)
 
             from models import Session as SessionModel
             from services.session_navigator import GREETING_MULTILINGUAL
