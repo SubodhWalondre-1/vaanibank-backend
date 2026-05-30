@@ -556,7 +556,7 @@ def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
             # Update fields dynamically in case they changed in settings
             existing.staff_id = sdata["staff_id"]
             existing.username = sdata["username"]
-            existing.password_hash = pwd_context.hash(sdata["password_plain"])
+            existing.password_hash = pwd_context.hash(sdata["password_plain"][:72])
             existing.full_name = sdata["full_name"]
             existing.languages_known = sdata["languages_known"]
             db.flush()
@@ -566,7 +566,7 @@ def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
         staff = StaffMember(
             staff_id=sdata["staff_id"],
             username=sdata["username"],
-            password_hash=pwd_context.hash(sdata["password_plain"]),
+            password_hash=pwd_context.hash(sdata["password_plain"][:72]),
             full_name=sdata["full_name"],
             role=sdata["role"],
             branch_id=branch.id,
