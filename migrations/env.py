@@ -96,10 +96,20 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Create an async engine and run migrations inside a sync wrapper."""
+    url = config.get_main_option("sqlalchemy.url") or ""
+    connect_args = {}
+    if "ssl=require" in url or "ssl=true" in url:
+        import ssl
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ssl_context
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,  # No pooling for migration runs
+        connect_args=connect_args,
     )
 
     async with connectable.connect() as connection:

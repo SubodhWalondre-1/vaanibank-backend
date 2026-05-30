@@ -41,6 +41,15 @@ _async_db_url: str = settings.DATABASE_URL.replace(
 
 logger.info("DB Engine Init URL: %s", _async_db_url.split("@")[-1] if "@" in _async_db_url else _async_db_url)
 
+import ssl
+
+_connect_args = {}
+if "ssl=require" in _async_db_url or "ssl=true" in _async_db_url:
+    _ssl_context = ssl.create_default_context()
+    _ssl_context.check_hostname = False
+    _ssl_context.verify_mode = ssl.CERT_NONE
+    _connect_args["ssl"] = _ssl_context
+
 engine = create_async_engine(
     _async_db_url,
     echo=settings.is_development,       # SQL logging in dev only
@@ -48,6 +57,7 @@ engine = create_async_engine(
     max_overflow=20,
     pool_pre_ping=True,                 # Detect stale connections
     pool_recycle=1800,                  # Recycle connections every 30 min
+    connect_args=_connect_args,
 )
 
 # Session factory
