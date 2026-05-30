@@ -552,11 +552,15 @@ def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
                 select(StaffMember).where(StaffMember.role == "admin")
             ).scalar_one_or_none()
 
+        # Safely extract, convert, and truncate the password
+        raw_pw = sdata.get("password_plain")
+        plain_password = str(raw_pw if raw_pw is not None else "admin123")[:72]
+
         if existing:
             # Update fields dynamically in case they changed in settings
             existing.staff_id = sdata["staff_id"]
             existing.username = sdata["username"]
-            existing.password_hash = pwd_context.hash(sdata["password_plain"][:72])
+            existing.password_hash = pwd_context.hash(plain_password)
             existing.full_name = sdata["full_name"]
             existing.languages_known = sdata["languages_known"]
             db.flush()
@@ -566,7 +570,7 @@ def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
         staff = StaffMember(
             staff_id=sdata["staff_id"],
             username=sdata["username"],
-            password_hash=pwd_context.hash(sdata["password_plain"][:72]),
+            password_hash=pwd_context.hash(plain_password),
             full_name=sdata["full_name"],
             role=sdata["role"],
             branch_id=branch.id,
