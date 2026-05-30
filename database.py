@@ -44,7 +44,7 @@ logger.info("DB Engine Init URL: %s", _async_db_url.split("@")[-1] if "@" in _as
 import ssl
 
 _connect_args = {}
-if "ssl=require" in _async_db_url or "ssl=true" in _async_db_url:
+if "neon.tech" in _async_db_url or "render.com" in _async_db_url:
     _ssl_context = ssl.create_default_context()
     _ssl_context.check_hostname = False
     _ssl_context.verify_mode = ssl.CERT_NONE

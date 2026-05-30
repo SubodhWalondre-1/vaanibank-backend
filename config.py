@@ -190,22 +190,19 @@ class Settings(BaseSettings):
         # Convert postgres:// to postgresql:// as SQLAlchemy 2.0 has deprecated postgres:// prefix
         if v.startswith("postgres://"):
             v = "postgresql://" + v[len("postgres://"):]
-        # Strip sslmode query parameter if it exists because asyncpg does not support it
+        # Strip sslmode and ssl query parameters if they exist because asyncpg/psycopg2 might conflict
         if "?" in v:
             base, query = v.split("?", 1)
             from urllib.parse import parse_qsl, urlencode
             params = dict(parse_qsl(query))
             if "sslmode" in params:
                 params.pop("sslmode")
-            if "neon.tech" in base or "render.com" in base:
-                params["ssl"] = "require"
+            if "ssl" in params:
+                params.pop("ssl")
             if params:
                 v = f"{base}?{urlencode(params)}"
             else:
                 v = base
-        else:
-            if "neon.tech" in v or "render.com" in v:
-                v = f"{v}?ssl=require"
         return v
 
     @field_validator("REDIS_URL")

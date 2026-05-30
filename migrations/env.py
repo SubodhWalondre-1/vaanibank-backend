@@ -98,7 +98,7 @@ async def run_async_migrations() -> None:
     """Create an async engine and run migrations inside a sync wrapper."""
     url = config.get_main_option("sqlalchemy.url") or ""
     connect_args = {}
-    if "ssl=require" in url or "ssl=true" in url:
+    if "neon.tech" in url or "render.com" in url:
         import ssl
         ssl_context = ssl.create_default_context()
         ssl_context.check_hostname = False

@@ -21,8 +21,12 @@ _sync_url = (
     settings.DATABASE_URL
     .replace("postgresql+asyncpg://", "postgresql://")
     .replace("postgresql+psycopg2://", "postgresql://")
-    .replace("ssl=require", "sslmode=require")
 )
+if "render.com" in _sync_url or "neon.tech" in _sync_url:
+    if "?" in _sync_url:
+        _sync_url += "&sslmode=require"
+    else:
+        _sync_url += "?sslmode=require"
 
 engine = create_engine(_sync_url, echo=False)
 SessionLocal = sessionmaker(bind=engine)
