@@ -38,9 +38,7 @@ from process_loader import get_key_info, get_process_steps, load_process
 logger = logging.getLogger("vaanibank.intent_engine")
 
 
-# ==============================================================================
 # DATA CLASSES
-# ==============================================================================
 
 @dataclass
 class KeyEntities:
@@ -77,9 +75,7 @@ class IntentResult:
     tts_voice: str = "hi-IN"
 
 
-# ==============================================================================
 # GROQ SYSTEM PROMPT  (v2 — entity-aware, actionable staff guidance)
-# ==============================================================================
 
 _SYSTEM_PROMPT = """You are VaaniBank AI — an intelligent assistant for Union Bank of India frontline staff.
 Customers may speak in ANY Indian language (Hindi, Tamil, Telugu, Gujarati, Marathi, Bengali, Malayalam, Kannada, Odia, Punjabi, English).
@@ -151,9 +147,7 @@ Your task is to analyse the customer's message and return a single valid JSON ob
 }"""
 
 
-# ==============================================================================
 # GROQ CALL
-# ==============================================================================
 
 async def _call_groq(text: str, language_code: str, api_key: str, model: str) -> dict:
     """
@@ -222,9 +216,7 @@ async def _call_groq(text: str, language_code: str, api_key: str, model: str) ->
         raise RuntimeError(f"JSON parse failed: {exc}")
 
 
-# ==============================================================================
 # PUBLIC API
-# ==============================================================================
 
 async def detect_intent(
     text:          str,
@@ -247,7 +239,7 @@ async def detect_intent(
     # Normalise language code (strip -IN suffix if frontend sends 'hi-IN')
     short_lang = language_code.split("-")[0].lower() if language_code else "hi"
 
-    # ── Groq call ──────────────────────────────────────────────────────────────
+    # Groq call
     llm_data: dict[str, Any] = {}
     try:
         llm_data = await _call_groq(
@@ -268,7 +260,7 @@ async def detect_intent(
             "key_entities":       {},
         }
 
-    # ── Parse LLM output ────────────────────────────────────────────────────────
+    # Parse LLM output
     raw_intent        = llm_data.get("intent", "GENERAL")
     sub_intent        = llm_data.get("sub_intent", "general")
     confidence        = float(llm_data.get("confidence", 0.5))
@@ -288,7 +280,7 @@ async def detect_intent(
         cibil_score   = raw_entities.get("cibil_score"),
     )
 
-    # ── Load process data ────────────────────────────────────────────────────────
+    # Load process data
     process_data  = load_process(normalised_intent)
     process_steps = get_process_steps(normalised_intent)
     key_info      = get_key_info(normalised_intent)

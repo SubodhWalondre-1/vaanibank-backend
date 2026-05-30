@@ -23,12 +23,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -45,11 +47,11 @@ from routers.ai_pipeline import router as ai_pipeline_router
 from routers.summary import router as summary_router
 from routers.staff import router as staff_router
 
-# ── SaralForm router (Phase 1) ────────────────────────────────────────────────
+# SaralForm router (Phase 1)
 # Provides POST /forms/submit and GET /forms/signature/{token}
 from routers.forms import router as forms_router
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# Logging
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,13 +61,20 @@ logging.basicConfig(
 logger = logging.getLogger("vaanibank.main")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # LIFESPAN — startup + shutdown
-# ══════════════════════════════════════════════════════════════════════════════
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    # ── Create storage directories ─────────────────────────────────────────────
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Handle application startup and shutdown lifecycle.
+
+    Guarantees that:
+      - Local storage folders for audio, summaries, and signatures are ready.
+      - Core PostgreSQL and Redis database connections are successfully tested.
+      - The RAG knowledge-base is pre-warmed.
+      - Production keep-alive pingers are scheduled.
+    """
+    # Create storage directories
     audio_dir = Path(settings.AUDIO_STORAGE_PATH)
     summary_dir = Path(settings.SUMMARY_STORAGE_PATH)
     # SaralForm signatures directory — created here so it's guaranteed to exist
@@ -80,7 +89,14 @@ async def lifespan(app: FastAPI):
         audio_dir, summary_dir, signatures_dir,
     )
 
-    # ── Test PostgreSQL ────────────────────────────────────────────────────────
+    # Download missing Noto Sans fonts in background
+    try:
+        from services.pdf_service import download_missing_fonts
+        asyncio.create_task(download_missing_fonts())
+    except Exception as exc:
+        logger.warning("Failed to start font downloader task: %s", exc)
+
+    # Test PostgreSQL
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -88,7 +104,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error("PostgreSQL connection FAILED: %s", exc)
 
-    # ── Test Redis ─────────────────────────────────────────────────────────────
+    # Test Redis
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -110,7 +126,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Redis connection FAILED: %s", exc)
 
-    # ── Auto-seed missing demo staff accounts ──────────────────────────────────
+    # Auto-seed missing demo staff accounts
     try:
         from passlib.context import CryptContext
         from sqlalchemy import select as sa_select
@@ -150,8 +166,8 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Auto-seed staff check failed (non-fatal): %s", exc)
 
-    # ── Pre-warm RAG service (run in background to avoid blocking port binding) ──
-    async def _prewarm_rag():
+    # Pre-warm RAG service (run in background to avoid blocking port binding)
+    async def _prewarm_rag() -> None:
         try:
             from services.rag_service import rag_service
             await rag_service.ensure_ready()
@@ -170,10 +186,10 @@ async def lifespan(app: FastAPI):
         settings.APP_PORT,
     )
 
-    # ── Keep-alive self-ping (prevents Render free tier from sleeping) ─────
+    # Keep-alive self-ping (prevents Render free tier from sleeping)
     keep_alive_task: asyncio.Task | None = None
 
-    async def _keep_alive_ping():
+    async def _keep_alive_ping() -> None:
         """Ping our own /health endpoint every 14 minutes to prevent Render
         free-tier instances from spinning down after 15 min of inactivity."""
         INTERVAL = 14 * 60  # 14 minutes in seconds
@@ -195,7 +211,7 @@ async def lifespan(app: FastAPI):
 
     yield  # ── Application running ────────────────────────────────────────────
 
-    # ── Cleanup ────────────────────────────────────────────────────────────────
+    # Cleanup
     if keep_alive_task and not keep_alive_task.done():
         keep_alive_task.cancel()
         try:
@@ -208,9 +224,7 @@ async def lifespan(app: FastAPI):
     logger.info("VaaniBank AI shut down — DB connections closed")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # APPLICATION
-# ══════════════════════════════════════════════════════════════════════════════
 
 app = FastAPI(
     title="VaaniBank AI",
@@ -225,10 +239,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Exception handlers (registered before middleware & routers) ───────────────
+# Exception handlers (registered before middleware & routers)
 register_exception_handlers(app)
 
-# ── Rate Limiting (AI endpoints — STT/LLM/TTS) ───────────────────────────────
+# Rate Limiting (AI endpoints — STT/LLM/TTS)
 from middleware.rate_limit import RateLimitMiddleware
 
 app.add_middleware(
@@ -237,10 +251,10 @@ app.add_middleware(
     window_seconds=60,
 )
 
-# ── GZip Compression ──────────────────────────────────────────────────────────
+# GZip Compression
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# CORS
 _allowed_origins: list[str] = [
     o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()
 ]
@@ -254,7 +268,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-# ── Static file mounts ────────────────────────────────────────────────────────
+# Static file mounts
 
 def _mount_static(route: str, directory: str, name: str) -> None:
     """Create the directory if absent, then mount it as a static file route."""
@@ -274,9 +288,14 @@ _mount_static(
     "signatures",
 )
 
-# ── CORS headers for static files (browser fetch needs this) ─────────────────
+# CORS headers for static files (browser fetch needs this)
 @app.middleware("http")
-async def add_cors_to_static(request: Request, call_next):
+async def add_cors_to_static(request: Request, call_next: Any) -> Response:
+    """
+    Middleware to inject cross-origin headers (CORS) for static resource mounts.
+
+    Enables cross-origin fetches for audio and PDF summaries directly from the browser.
+    """
     response = await call_next(request)
     if (
         request.url.path.startswith("/audio/")
@@ -289,7 +308,7 @@ async def add_cors_to_static(request: Request, call_next):
         response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
-# ── Routers ───────────────────────────────────────────────────────────────────
+# Routers
 app.include_router(auth_router)         # /auth/login  /auth/logout  /auth/refresh  /auth/me
 app.include_router(sessions_router)     # /sessions/*  /ws/{token_number}
 app.include_router(ai_pipeline_router)  # /stt/*  /llm/*  /tts/*
@@ -305,9 +324,7 @@ async def root_ping() -> dict:
     return {"status": "ok", "app": "VaaniBank AI Backend", "version": "1.0.0"}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HEALTH ENDPOINTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 async def _check_db() -> dict:
     try:
@@ -397,9 +414,7 @@ async def health_services() -> JSONResponse:
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _redact_url(url: str) -> str:
     """Replace the password in a DB/Redis connection URL with *** for safe logging."""
@@ -415,9 +430,7 @@ def _redact_url(url: str) -> str:
     return url
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # ENTRYPOINT
-# ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     dev_mode = settings.APP_ENV == "development"

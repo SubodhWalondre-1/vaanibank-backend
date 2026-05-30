@@ -45,9 +45,7 @@ logger = logging.getLogger("vaanibank.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /auth/login
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/login",
@@ -139,9 +137,7 @@ async def login(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /auth/logout
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/logout",
@@ -168,9 +164,7 @@ async def logout(
     return LogoutResponse(message="Logged out successfully.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /auth/refresh
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/refresh",
@@ -231,9 +225,7 @@ async def refresh_token(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /auth/me
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/me",
@@ -265,9 +257,7 @@ async def me(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /auth/demo-teller
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/demo-teller",
@@ -332,4 +322,4 @@ async def generate_demo_teller(db: AsyncSession = Depends(get_db)):
         "full_name": new_staff.full_name,
         "role": str(new_staff.role),
         "branch_name": branch.branch_name,
-    }
+    }

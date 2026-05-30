@@ -18,9 +18,7 @@ from routers._pipeline_helpers import (
 )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # LANGUAGE MAPPING TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestLangCodeToName:
     def test_hindi(self):
@@ -38,6 +36,11 @@ class TestLangCodeToName:
     def test_empty_defaults_to_hindi(self):
         assert lang_code_to_name("") == "Hindi"
 
+    def test_suffix_stripping(self):
+        assert lang_code_to_name("mr-IN") == "Marathi"
+        assert lang_code_to_name("ta-in") == "Tamil"
+        assert lang_code_to_name("gu-IN ") == "Gujarati"
+
 
 class TestLangCodeToAttr:
     def test_hindi(self):
@@ -49,6 +52,11 @@ class TestLangCodeToAttr:
     def test_odia(self):
         assert lang_code_to_attr("or") == "odia"
 
+    def test_suffix_stripping(self):
+        assert lang_code_to_attr("mr-IN") == "marathi"
+        assert lang_code_to_attr("ta-in") == "tamil"
+        assert lang_code_to_attr("gu-IN ") == "gujarati"
+
     def test_all_ten_languages_mapped(self):
         codes = ["hi", "mr", "ta", "te", "bn", "kn", "or", "pa", "gu", "ml"]
         for code in codes:
@@ -57,9 +65,7 @@ class TestLangCodeToAttr:
             assert result.isalpha(), f"Mapping for {code} should be alpha: {result}"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # INPUT KEYWORD MAP TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestInputKeywordMap:
     def test_map_has_six_entries(self):
@@ -127,9 +133,7 @@ class TestInputKeywordMap:
         assert matched is None
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # TRANSLATION RETRY DETECTION TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestNeedsHindiTranslationRetry:
     def test_proper_hindi_no_retry(self):

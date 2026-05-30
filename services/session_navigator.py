@@ -16,9 +16,7 @@ from typing import Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SESSION PHASES
-# ══════════════════════════════════════════════════════════════════════════════
 
 class Phase:
     GREET    = "greet"       # No intent yet, welcome the customer
@@ -29,10 +27,8 @@ class Phase:
     CLOSE    = "close"       # Done — summary and farewell
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # QUESTION BANK — Static, deterministic, per-intent field priorities
 # Each field has: priority (lower = ask first), hindi question, english label
-# ══════════════════════════════════════════════════════════════════════════════
 
 QUESTION_BANK = {
     "loan_enquiry": [
@@ -105,7 +101,7 @@ QUESTION_BANK = {
 }
 
 
-# ── Greeting scripts per intent ──────────────────────────────────────────────
+# Greeting scripts per intent
 
 GREETING_SCRIPTS = {
     "general":         "नमस्ते, Union Bank of India में आपका स्वागत है। मैं आपकी क्या मदद कर सकता हूँ?",
@@ -128,7 +124,7 @@ FAREWELL_SCRIPTS = {
 }
 
 
-# ── Multilingual greeting messages — auto-sent to customer on connect ────────
+# Multilingual greeting messages — auto-sent to customer on connect
 # Key = ISO 639-1 language code (matches customer_language_code)
 
 GREETING_MULTILINGUAL = {
@@ -144,85 +140,83 @@ GREETING_MULTILINGUAL = {
     "ml": "🙏 നമസ്കാരം! Union Bank of India ലേക്ക് സ്വാഗതം. എനിക്ക് നിങ്ങളെ എങ്ങനെ സേവിക്കാം?",
 }
 
-# ── Multilingual farewell + "how else can I help?" messages ──────────────────
+# Multilingual farewell + "how else can I help?" messages
 
 FAREWELL_MULTILINGUAL = {
-    "hi": "🙏 धन्यवाद! आपका काम हो गया है। मैं आपकी और क्या सेवा कर सकती हूँ?",
-    "mr": "🙏 धन्यवाद! तुमचे काम झाले आहे. मी तुमची अजून कशी सेवा करू शकते?",
-    "ta": "🙏 நன்றி! உங்கள் பணி முடிந்தது. நான் உங்களுக்கு வேறு எப்படி உதவ முடியும்?",
-    "te": "🙏 ధన్యవాదాలు! మీ పని పూర్తయింది. నేను మీకు ఇంకా ఎలా సేవ చేయగలను?",
-    "bn": "🙏 ধন্যবাদ! আপনার কাজ হয়ে গেছে। আমি আপনার আর কী সেবা করতে পারি?",
-    "kn": "🙏 ಧನ್ಯವಾದ! ನಿಮ್ಮ ಕೆಲಸ ಮುಗಿದಿದೆ. ನಾನು ನಿಮಗೆ ಇನ್ನೂ ಹೇಗೆ ಸೇವೆ ಮಾಡಬಹುದು?",
-    "or": "🙏 ଧନ୍ୟବାଦ! ଆପଣଙ୍କ କାମ ହୋଇଗଲା। ମୁଁ ଆପଣଙ୍କ ଆଉ କି ସେବା କରିପାରିବି?",
-    "pa": "🙏 ਧੰਨਵਾਦ! ਤੁਹਾਡਾ ਕੰਮ ਹੋ ਗਿਆ ਹੈ। ਮੈਂ ਤੁਹਾਡੀ ਹੋਰ ਕੀ ਸੇਵਾ ਕਰ ਸਕਦੀ ਹਾਂ?",
-    "gu": "🙏 આભાર! તમારું કામ થઈ ગયું છે. હું તમારી બીજી શું સેવા કરી શકું?",
-    "ml": "🙏 നന്ദി! നിങ്ങളുടെ കാര്യം കഴിഞ്ഞു. എനിക്ക് നിങ്ങളെ വേറെ എങ്ങനെ സേവിക്കാം?",
+    "hi": "🙏 धन्यवाद! आपकी सारी information मिल गई है और verification process भी start कर दी गई है। यह session अब automatically end हो जाएगा।",
+    "mr": "🙏 धन्यवाद! तुमची सर्व माहिती मिळाली आहे आणि verification process सुरू करण्यात आली आहे. हे session आता आपोआप बंद होईल.",
+    "ta": "🙏 நன்றி! உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன மற்றும் verification process தொடங்கப்பட்டுள்ளது. இந்த session தானாகவே முடிவடையும்.",
+    "te": "🙏 ధన్యవాదాలు! మీ అన్ని సమాచారం అందుకున్నాము మరియు verification process ప్రారంభించబడింది. ఈ session ఇప్పుడు స్వయంచాలకంగా ముగుస్తుంది.",
+    "bn": "🙏 ধন্যবাদ! আপনার সমস্ত তথ্য পাওয়া গেছে এবং verification process শুরু করা হয়েছে। এই session এখন স্বয়ংক্রিয়ভাবে শেষ হবে।",
+    "kn": "🙏 ಧನ್ಯವಾದ! ನಿಮ್ಮ ಎಲ್ಲಾ ಮಾಹಿತಿ ಸ್ವೀಕರಿಸಲಾಗಿದೆ ಮತ್ತು verification process ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ. ಈ session ಈಗ ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮುಗಿಯುತ್ತದೆ.",
+    "or": "🙏 ଧନ୍ୟବାଦ! ଆପଣଙ୍କ ସମସ୍ତ ତଥ୍ୟ ମିଳିଗଲା ଏବଂ verification process ଆରମ୍ଭ କରାଯାଇଛି। ଏହି session ଏବେ ସ୍ୱୟଂଚାଳିତ ଭାବେ ସମାପ୍ତ ହେବ।",
+    "pa": "🙏 ਧੰਨਵਾਦ! ਤੁਹਾਡੀ ਸਾਰੀ ਜਾਣਕਾਰੀ ਮਿਲ ਗਈ ਹੈ ਅਤੇ verification process ਸ਼ੁਰੂ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ। ਇਹ session ਹੁਣ ਆਪਣੇ ਆਪ ਖ਼ਤਮ ਹੋ ਜਾਵੇਗਾ।",
+    "gu": "🙏 આભાર! તમારી બધી માહિતી મળી ગઈ છે અને verification process શરૂ કરવામાં આવી છે. આ session હવે આપોઆપ સમાપ્ત થશે.",
+    "ml": "🙏 നന്ദി! നിങ്ങളുടെ എല്ലാ വിവരങ്ങളും ലഭിച്ചു, verification process ആരംഭിച്ചിരിക്കുന്നു. ഈ session ഇപ്പോൾ സ്വയമേവ അവസാനിക്കും.",
 }
 
-# ── Verification time per intent — Hindi + multilingual messages ─────────────
+# Verification time per intent — Hindi + multilingual messages
 # Each key has: time_text_hi (Hindi), time_text map per language
 
 VERIFICATION_TIME_MAP = {
     "account_opening": {
         "time": "same day",
-        "hi": "📋 आपके खाता खोलने की प्रक्रिया Same Day में पूरी हो जाएगी। सभी documents सही हैं।",
-        "mr": "📋 तुमचे खाते उघडण्याची प्रक्रिया Same Day पूर्ण होईल. सर्व कागदपत्रे योग्य आहेत.",
-        "ta": "📋 உங்கள் கணக்கு திறக்கும் செயல்முறை Same Day முடிவடையும். அனைத்து ஆவணங்களும் சரியாக உள்ளன.",
-        "te": "📋 మీ ఖాతా తెరవడం Same Day పూర్తవుతుంది. అన్ని పత్రాలు సరిగ్గా ఉన్నాయి.",
-        "bn": "📋 আপনার অ্যাকাউন্ট খোলার প্রক্রিয়া Same Day সম্পন্ন হবে। সমস্ত নথি সঠিক আছে।",
-        "en": "📋 Your account opening will be completed same day. All documents are verified.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपके खाता खोलने की प्रक्रिया Same Day में पूरी हो जाएगी।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमचे खाते उघडण्याची प्रक्रिया Same Day पूर्ण होईल.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் கணக்கு திறக்கும் செயல்முறை Same Day முடிவடையும்.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ ఖాతా తెరవడం Same Day పూర్తవుతుంది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার অ্যাকাউন্ট খোলার প্রক্রিয়া Same Day সম্পন্ন হবে।",
+        "en": "📋 All your information has been collected. Your account opening will be completed same day.",
     },
     "loan_enquiry": {
         "time": "3-5 working days",
-        "hi": "📋 आपके लोन की Verification में 3-5 कार्य दिवस लगेंगे। सभी documents verified हैं।",
-        "mr": "📋 तुमच्या कर्जाच्या Verification ला 3-5 कार्य दिवस लागतील. सर्व कागदपत्रे verified आहेत.",
-        "ta": "📋 உங்கள் கடன் சரிபார்ப்பு 3-5 வேலை நாட்கள் ஆகும். அனைத்து ஆவணங்களும் verified.",
-        "te": "📋 మీ రుణ Verification కు 3-5 పని దినాలు పడుతుంది. అన్ని పత్రాలు verified.",
-        "bn": "📋 আপনার ঋণ Verification-এ 3-5 কর্ম দিবস লাগবে। সমস্ত নথি verified।",
-        "en": "📋 Your loan verification will take 3-5 working days. All documents are verified.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपके लोन की Verification process start कर दी गई है, इसमें 3-5 कार्य दिवस लगेंगे।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमच्या कर्जाची Verification process सुरू झाली आहे, यास 3-5 कार्य दिवस लागतील.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் கடன் Verification process தொடங்கப்பட்டுள்ளது, 3-5 வேலை நாட்கள் ஆகும்.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ రుణ Verification process ప్రారంభించబడింది, 3-5 పని దినాలు పడుతుంది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার ঋণ Verification process শুরু হয়েছে, এতে 3-5 কর্ম দিবস লাগবে।",
+        "en": "📋 All your information has been collected. Your loan verification process has started, it will take 3-5 working days.",
     },
     "kyc_update": {
         "time": "2-3 working days",
-        "hi": "📋 आपके KYC update की processing में 2-3 कार्य दिवस लगेंगे। सभी documents verified हैं।",
-        "mr": "📋 तुमच्या KYC update ला 2-3 कार्य दिवस लागतील. सर्व कागदपत्रे verified आहेत.",
-        "ta": "📋 உங்கள் KYC update 2-3 வேலை நாட்கள் ஆகும். அனைத்து ஆவணங்களும் verified.",
-        "te": "📋 మీ KYC update కు 2-3 పని దినాలు పడుతుంది. అన్ని పత్రాలు verified.",
-        "bn": "📋 আপনার KYC update-এ 2-3 কর্ম দিবস লাগবে। সমস্ত নথি verified।",
-        "en": "📋 Your KYC update will take 2-3 working days. All documents are verified.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपके KYC update की processing start कर दी गई है, इसमें 2-3 कार्य दिवस लगेंगे।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमच्या KYC update ची processing सुरू झाली आहे, यास 2-3 कार्य दिवस लागतील.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் KYC update processing தொடங்கப்பட்டுள்ளது, 2-3 வேலை நாட்கள் ஆகும்.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ KYC update processing ప్రారంభించబడింది, 2-3 పని దినాలు పడుతుంది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার KYC update processing শুরু হয়েছে, এতে 2-3 কর্ম দিবস লাগবে।",
+        "en": "📋 All your information has been collected. Your KYC update processing has started, it will take 2-3 working days.",
     },
     "fixed_deposit": {
         "time": "same day",
-        "hi": "📋 आपकी FD Same Day में open हो जाएगी। सभी details verified हैं।",
-        "mr": "📋 तुमची FD Same Day उघडेल. सर्व details verified आहेत.",
-        "ta": "📋 உங்கள் FD Same Day திறக்கப்படும். அனைத்து details verified.",
-        "te": "📋 మీ FD Same Day తెరవబడుతుంది. అన్ని details verified.",
-        "bn": "📋 আপনার FD Same Day খোলা হবে। সমস্ত details verified।",
-        "en": "📋 Your FD will be opened same day. All details are verified.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपकी FD Same Day में open हो जाएगी।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमची FD Same Day उघडेल.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் FD Same Day திறக்கப்படும்.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ FD Same Day తెరవబడుతుంది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার FD Same Day খোলা হবে।",
+        "en": "📋 All your information has been collected. Your FD will be opened same day.",
     },
     "card_services": {
         "time": "7-10 working days",
-        "hi": "📋 आपके Card की processing में 7-10 कार्य दिवस लगेंगे। Request submit हो गई है।",
-        "mr": "📋 तुमच्या Card processing ला 7-10 कार्य दिवस लागतील. Request submit झाली आहे.",
-        "ta": "📋 உங்கள் Card processing 7-10 வேலை நாட்கள் ஆகும். Request submit ஆகிவிட்டது.",
-        "te": "📋 మీ Card processing కు 7-10 పని దినాలు పడుతుంది. Request submit అయింది.",
-        "bn": "📋 আপনার Card processing-এ 7-10 কর্ম দিবস লাগবে। Request submit হয়ে গেছে।",
-        "en": "📋 Your card processing will take 7-10 working days. Request is submitted.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपके Card की processing start कर दी गई है, इसमें 7-10 कार्य दिवस लगेंगे।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमच्या Card ची processing सुरू झाली आहे, यास 7-10 कार्य दिवस लागतील.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் Card processing தொடங்கப்பட்டுள்ளது, 7-10 வேலை நாட்கள் ஆகும்.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ Card processing ప్రారంభించబడింది, 7-10 పని దినాలు పడుతుంది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার Card processing শুরু হয়েছে, এতে 7-10 কর্ম দিবস লাগবে।",
+        "en": "📋 All your information has been collected. Your card processing has started, it will take 7-10 working days.",
     },
     "balance_enquiry": {
         "time": "immediate",
-        "hi": "📋 आपकी Balance enquiry complete हो गई है।",
-        "mr": "📋 तुमची Balance enquiry पूर्ण झाली आहे.",
-        "ta": "📋 உங்கள் Balance enquiry முடிந்தது.",
-        "te": "📋 మీ Balance enquiry పూర్తయింది.",
-        "bn": "📋 আপনার Balance enquiry সম্পন্ন হয়েছে।",
-        "en": "📋 Your balance enquiry is complete.",
+        "hi": "📋 आपकी सारी जानकारी मिल गई है। आपकी Balance enquiry complete हो गई है।",
+        "mr": "📋 तुमची सर्व माहिती मिळाली आहे. तुमची Balance enquiry पूर्ण झाली आहे.",
+        "ta": "📋 உங்கள் அனைத்து தகவல்களும் பெறப்பட்டுள்ளன. உங்கள் Balance enquiry முடிந்தது.",
+        "te": "📋 మీ అన్ని సమాచారం అందుకున్నాము. మీ Balance enquiry పూర్తయింది.",
+        "bn": "📋 আপনার সমস্ত তথ্য পাওয়া গেছে। আপনার Balance enquiry সম্পন্ন হয়েছে।",
+        "en": "📋 All your information has been collected. Your balance enquiry is complete.",
     },
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # CORE ENGINE — Pure functions, no LLM dependency
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _is_filled(val) -> bool:
     """Check if a collected_info field has a real value."""

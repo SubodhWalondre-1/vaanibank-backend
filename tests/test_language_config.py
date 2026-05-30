@@ -21,9 +21,7 @@ from language_config import (
 )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # INTENT NORMALISATION
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestNormaliseIntent:
     def test_uppercase_passthrough(self):
@@ -61,9 +59,7 @@ class TestNormaliseIntent:
             assert normalise_intent(intent) == intent
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # LANGUAGE HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestLanguageHelpers:
     def test_get_language_name_hindi(self):

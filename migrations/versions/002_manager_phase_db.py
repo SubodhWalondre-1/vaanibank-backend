@@ -18,7 +18,7 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-# ── Revision identifiers ──────────────────────────────────────────────────────
+# Revision identifiers
 # 002 branches off e4ef62d0f1cb (parallel to 003/004 chain).
 # This is intentional — both branches must be merged before adding new columns.
 # Use: alembic upgrade heads   (applies both branch tips)

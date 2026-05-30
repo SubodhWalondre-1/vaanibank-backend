@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Dict
 
 
-# ── Language code → English display name ──────────────────────────────────────
+# Language code → English display name
 LANG_CODE_TO_NAME: Dict[str, str] = {
     "hi": "Hindi",
     "mr": "Marathi",
@@ -31,7 +31,7 @@ LANG_CODE_TO_NAME: Dict[str, str] = {
 }
 
 
-# ── Language code → DB column suffix (e.g., ProcessStep.step_text_{attr}) ─────
+# Language code → DB column suffix (e.g., ProcessStep.step_text_{attr})
 LANG_CODE_TO_ATTR: Dict[str, str] = {
     "hi": "hindi",
     "mr": "marathi",
@@ -46,7 +46,7 @@ LANG_CODE_TO_ATTR: Dict[str, str] = {
 }
 
 
-# ── BCP-47 mapping for Sarvam API ────────────────────────────────────────────
+# BCP-47 mapping for Sarvam API
 SARVAM_LANG_MAP: Dict[str, str] = {
     "hi": "hi-IN",
     "mr": "mr-IN",
@@ -62,11 +62,11 @@ SARVAM_LANG_MAP: Dict[str, str] = {
 }
 
 
-# ── Languages supported by Sarvam STT ────────────────────────────────────────
+# Languages supported by Sarvam STT
 SARVAM_LANGUAGES = frozenset(SARVAM_LANG_MAP.keys())
 
 
-# ── Reverie language codes ────────────────────────────────────────────────────
+# Reverie language codes
 REVERIE_LANG_MAP: Dict[str, str] = {
     "hi": "hi",
     "mr": "mr",
@@ -82,19 +82,25 @@ REVERIE_LANG_MAP: Dict[str, str] = {
 }
 
 
-# ── Reverse map: display name (lowercase) → language code ────────────────────
+# Reverse map: display name (lowercase) → language code
 LANG_NAME_TO_CODE: Dict[str, str] = {
     name.lower(): code for code, name in LANG_CODE_TO_NAME.items()
 }
 
 
-# ── Convenience functions ─────────────────────────────────────────────────────
+# Convenience functions
 
 def lang_code_to_name(code: str) -> str:
     """Convert a BCP-47 short language code to its English name."""
-    return LANG_CODE_TO_NAME.get(code, "Hindi")
+    if not code:
+        return "Hindi"
+    clean_code = code.split("-")[0].strip().lower()
+    return LANG_CODE_TO_NAME.get(clean_code, "Hindi")
 
 
 def lang_code_to_attr(code: str) -> str:
     """Convert a language code to the DB column suffix (e.g., 'hi' → 'hindi')."""
-    return LANG_CODE_TO_ATTR.get(code, "hindi")
+    if not code:
+        return "hindi"
+    clean_code = code.split("-")[0].strip().lower()
+    return LANG_CODE_TO_ATTR.get(clean_code, "hindi")

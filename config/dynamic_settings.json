@@ -1,0 +1,13 @@
+{
+    "demo_mode": false,
+    "default_session_timeout": 15,
+    "max_exchanges_per_session": 50,
+    "pii_detection": true,
+    "idle_timeout": 5,
+    "primary_stt": "sarvam_saarika_2.5",
+    "fallback_stt_1": "groq_whisper",
+    "fallback_stt_2": "reverie",
+    "llm_model": "groq_llama_3.3_70b",
+    "translation_engine": "sarvam_translate",
+    "tts_engine": "sarvam_bulbul_v3"
+}

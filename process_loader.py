@@ -21,7 +21,7 @@ from language_config import normalise_intent
 
 logger = logging.getLogger("vaanibank.process_loader")
 
-# ── Intent → filename map ────────────────────────────────────────────────────
+# Intent → filename map
 INTENT_FILE_MAP: dict[str, str] = {
     "HOME_LOAN":       "home_loan.json",
     "PERSONAL_LOAN":   "personal_loan.json",
@@ -75,7 +75,7 @@ def load_process(intent: str) -> dict:
             "Unexpected error loading %s: %s | falling back to default.json", filename, exc
         )
 
-    # ── Fallback ──────────────────────────────────────────────────────────────
+    # Fallback
     default_path = _PROCESSES_DIR / _DEFAULT_FILE
     try:
         return _read_json(default_path)

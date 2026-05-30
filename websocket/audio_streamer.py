@@ -24,7 +24,7 @@ from typing import List, Optional
 
 logger = logging.getLogger("vaanibank.audio_streamer")
 
-# ── Tuning constants ────────────────────────────────────────────────────────────
+# Tuning constants
 PCM_SAMPLE_RATE: int   = 16_000          # Hz — must match AudioContext on frontend
 PCM_CHANNELS:   int   = 1               # mono
 PCM_BYTES_PER_SAMPLE: int = 4           # Float32 = 4 bytes per sample
@@ -41,9 +41,7 @@ SILENCE_TIMEOUT_SEC: float  = 2.0
 MIN_BYTES_FOR_STT: int = PCM_SAMPLE_RATE * PCM_BYTES_PER_SAMPLE // 2   # 32 000 bytes
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # AudioStreamSession  (one per active token_number that is speaking)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class AudioStreamSession:
@@ -73,7 +71,7 @@ class AudioStreamSession:
     final_triggered:        bool            = False
     last_partial_text:      str             = ""
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
+    # Helpers
 
     def append_chunk(self, raw_bytes: bytes) -> None:
         """Append a new PCM binary frame from the WebSocket."""
@@ -81,12 +79,15 @@ class AudioStreamSession:
         self.last_chunk_at = time.monotonic()
 
     def total_bytes(self) -> int:
+        """Calculate the total size of accumulated raw Float32 PCM audio chunks in bytes."""
         return sum(len(c) for c in self.chunks)
 
     def total_samples(self) -> int:
+        """Derive the total number of audio samples based on Float32 size (4 bytes/sample)."""
         return self.total_bytes() // PCM_BYTES_PER_SAMPLE
 
     def duration_seconds(self) -> float:
+        """Derive the current total duration of the accumulated audio buffer in seconds."""
         return self.total_samples() / PCM_SAMPLE_RATE
 
     def is_silent(self) -> bool:
@@ -141,7 +142,7 @@ class AudioStreamSession:
         return buf.getvalue()
 
 
-# ── Convenience float32→wav function (also usable standalone) ──────────────────
+# Convenience float32→wav function (also usable standalone)
 
 def float32_bytes_to_wav(
     raw_bytes: bytes,

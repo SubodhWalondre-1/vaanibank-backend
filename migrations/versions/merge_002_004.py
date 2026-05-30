@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from alembic import op
 
-# ── Revision identifiers ──────────────────────────────────────────────────────
+# Revision identifiers
 revision: str = "merge_002_004"
 down_revision = ("002", "004_perf_indexes")   # tuple = merge point
 branch_labels = None

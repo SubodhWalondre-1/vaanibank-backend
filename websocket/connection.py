@@ -77,11 +77,11 @@ class ConnectionMixin:
                 ),
             )
 
-        # ── Staff reconnect: replay last exchange so they don't miss context ──
+        # Staff reconnect: replay last exchange so they don't miss context
         if role == "staff" and customer_already_connected:
             await self._replay_last_exchange(token_number)
 
-        # ── Auto-greeting: when staff connects and customer is already here and has selected service ──
+        # Auto-greeting: when staff connects and customer is already here and has selected service
         if role == "staff" and customer_already_connected:
             if token_number not in self.greeted_tokens:
                 try:
@@ -300,13 +300,18 @@ class ConnectionMixin:
         self,
         token_number: str,
         session_id: Optional[int],
-    ) -> None:
+    ) -> float:
         """
-        Send a thank-you + "how else can I help?" message in the customer's
-        language before the session_ended event is broadcast.
+        Send a thank-you + verification message in the customer's language
+        before the session_ended event is broadcast.
 
         Also sends the verification/processing time message based on intent.
+
+        Returns the farewell TTS duration in seconds so the caller can wait
+        for the audio to finish playing before broadcasting session_ended.
         """
+        tts_duration: float = 0.0
+
         try:
             from models import Session as SessionModel
             from services.session_navigator import (
@@ -315,7 +320,7 @@ class ConnectionMixin:
             )
 
             if not session_id:
-                return
+                return 0.0
 
             async with await self._get_db() as db:
                 result = await db.execute(
@@ -327,12 +332,12 @@ class ConnectionMixin:
                 row = result.one_or_none()
 
             if not row:
-                return
+                return 0.0
 
             lang_code = (row.customer_language_code or "hi").split("-")[0].lower()
             intent = (row.intent_detected or "general").lower()
 
-            # ── Step 1: Send verification time message ────────────────────────
+            # Step 1: Send verification time message
             time_map = VERIFICATION_TIME_MAP.get(intent)
             if time_map:
                 time_text = time_map.get(lang_code, time_map.get("en", time_map.get("hi", "")))
@@ -353,7 +358,7 @@ class ConnectionMixin:
                     # Small delay between verification and farewell messages
                     await asyncio.sleep(0.5)
 
-            # ── Step 2: Send farewell message ─────────────────────────────────
+            # Step 2: Send farewell message
             farewell_text = FAREWELL_MULTILINGUAL.get(
                 lang_code, FAREWELL_MULTILINGUAL["hi"]
             )
@@ -382,9 +387,10 @@ class ConnectionMixin:
                     duration_seconds=tts_result.duration_seconds,
                     response_text=farewell_text,
                 )
+                tts_duration = tts_result.duration_seconds or 0.0
                 logger.info(
-                    "Auto-farewell sent with TTS | token=%s | lang=%s",
-                    token_number, lang_code,
+                    "Auto-farewell sent with TTS | token=%s | lang=%s | duration=%.1fs",
+                    token_number, lang_code, tts_duration,
                 )
             except Exception as tts_exc:
                 logger.warning(
@@ -397,3 +403,5 @@ class ConnectionMixin:
                 "Auto-farewell failed (non-fatal) | token=%s | %s",
                 token_number, exc,
             )
+
+        return tts_duration

@@ -51,9 +51,7 @@ logger = logging.getLogger("vaanibank.ai_pipeline")
 router = APIRouter(tags=["ai-pipeline"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /stt/transcribe
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/stt/transcribe",
@@ -76,7 +74,7 @@ async def transcribe_audio(
     Auth: Staff JWT required.
     Delegates to PipelineOrchestrator for STT → LLM → DB → WebSocket flow.
     """
-    # ── Validate session is still active ──────────────────────────────────────
+    # Validate session is still active
     session_check = await db.execute(
         select(Session.status).where(Session.id == session_id)
     )
@@ -122,9 +120,7 @@ async def transcribe_audio(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /stt/customer-transcribe  (PUBLIC — no auth, for customer panel)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/stt/customer-transcribe",
@@ -145,7 +141,7 @@ async def customer_transcribe_audio(
     No JWT required — validates by checking the session exists.
     Delegates to PipelineOrchestrator for the shared pipeline.
     """
-    # ── Validate session exists ───────────────────────────────────────────────
+    # Validate session exists
     session_result = await db.execute(
         select(Session).where(
             Session.token_number == token_number,
@@ -166,7 +162,7 @@ async def customer_transcribe_audio(
 
     audio_bytes = await audio.read()
 
-    # ── STT with graceful fallback (customer panel never sees 500s) ───────────
+    # STT with graceful fallback (customer panel never sees 500s)
     try:
         result = await run_transcription_pipeline(
             audio_bytes=audio_bytes,
@@ -209,7 +205,7 @@ async def customer_transcribe_audio(
             response_time_ms=0,
         )
 
-    # ── Smart Input Trigger (customer panel only) ─────────────────────────────
+    # Smart Input Trigger (customer panel only)
     await _trigger_input_request_if_needed(
         token_number=token_number,
         text=result.text_original,
@@ -233,9 +229,7 @@ async def customer_transcribe_audio(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /stt/staff-transcribe  (staff speak → STT only, no DB, no WS, no LLM)
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 
@@ -280,9 +274,7 @@ async def staff_transcribe_audio(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /stt/detect-language
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/stt/detect-language",
@@ -305,9 +297,7 @@ async def detect_language(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /llm/process
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/llm/process",
@@ -363,9 +353,7 @@ async def llm_process(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /llm/translate-staff-response
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/llm/translate-staff-response",
@@ -400,9 +388,7 @@ async def translate_staff_response(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /tts/generate
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/tts/generate",
@@ -456,9 +442,7 @@ async def generate_tts(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /tts/audio/{filename}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/tts/audio/{filename}",
@@ -479,9 +463,7 @@ async def serve_audio(filename: str) -> FileResponse:
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /llm/translate-to-english
-# ══════════════════════════════════════════════════════════════════════════════
 
 
 
@@ -504,9 +486,7 @@ async def translate_to_english(
     return TranslateToEnglishResponse(english_text=result)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # INTERNAL HELPERS — extracted to routers/_pipeline_helpers.py
-# ══════════════════════════════════════════════════════════════════════════════
 # Re-export for backward compatibility with callers inside this file
 from routers._pipeline_helpers import (
     initialize_process_steps as _initialize_process_steps,

@@ -26,7 +26,7 @@ from passlib.context import CryptContext
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session as SyncSession, sessionmaker
 
-# ── Sync engine (seed script — no async needed) ────────────────────────────────
+# Sync engine (seed script — no async needed)
 # Convert asyncpg URL back to psycopg2 for sync usage
 from config import settings
 from models import Branch, ProcessStep, Session, StaffMember
@@ -35,17 +35,16 @@ _sync_url: str = (
     settings.DATABASE_URL
     .replace("postgresql+asyncpg://", "postgresql://")
     .replace("postgresql+psycopg2://", "postgresql://")
+    .replace("ssl=require", "sslmode=require")
 )
 
 engine = create_engine(_sync_url, echo=False)
-SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+session_local = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SEED DATA DEFINITIONS
-# ══════════════════════════════════════════════════════════════════════════════
 
 BRANCHES_DATA: List[Dict[str, Any]] = [
     {
@@ -116,11 +115,11 @@ STAFF_DATA: List[Dict[str, Any]] = [
     },
 ]
 
-# ── Process Steps ──────────────────────────────────────────────────────────────
+# Process Steps
 # Each step: dict with all language text fields.
 # Languages: hi (required), mr, ta, te, bn, kn, or, pa (optional)
 
-# ── Demo Sessions Data ────────────────────────────────────────────────────────
+# Demo Sessions Data
 # Pre-filled profile data for hackathon judges
 # Token numbers are fixed so QR codes remain stable in demo
 
@@ -188,7 +187,7 @@ DEMO_SESSIONS_DATA: List[Dict[str, Any]] = [
 
 PROCESS_STEPS: List[Dict[str, Any]] = [
 
-    # ── account_opening ───────────────────────────────────────────────────────
+    # account_opening
     {
         "intent_type": "account_opening",
         "step_number": 1,
@@ -254,7 +253,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
         "is_active": True,
     },
 
-    # ── loan_enquiry ──────────────────────────────────────────────────────────
+    # loan_enquiry
     {
         "intent_type": "loan_enquiry",
         "step_number": 1,
@@ -320,7 +319,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
         "is_active": True,
     },
 
-    # ── kyc_update ────────────────────────────────────────────────────────────
+    # kyc_update
     {
         "intent_type": "kyc_update",
         "step_number": 1,
@@ -370,7 +369,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
         "is_active": True,
     },
 
-    # ── balance_enquiry ───────────────────────────────────────────────────────
+    # balance_enquiry
     {
         "intent_type": "balance_enquiry",
         "step_number": 1,
@@ -404,7 +403,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
         "is_active": True,
     },
 
-    # ── card_services ─────────────────────────────────────────────────────────
+    # card_services
     {
         "intent_type": "card_services",
         "step_number": 1,
@@ -454,7 +453,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
         "is_active": True,
     },
 
-    # ── fixed_deposit ────────────────────────────────────────────────────────
+    # fixed_deposit
     {
         "intent_type": "fixed_deposit",
         "step_number": 1,
@@ -506,9 +505,7 @@ PROCESS_STEPS: List[Dict[str, Any]] = [
 ]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SEED FUNCTIONS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def seed_branches(db: SyncSession) -> Dict[str, Branch]:
     """Insert all branches, return {branch_code: Branch} map."""
@@ -634,7 +631,7 @@ def seed_demo_sessions(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
             pii_detected=True,
             started_at=now,
             created_at=now,
-            # ── Customer PII fields ──
+            # Customer PII fields
             customer_name=sdata.get("customer_name"),
             customer_account_number=sdata.get("customer_account_number"),
             customer_mobile_number=sdata.get("customer_mobile_number"),
@@ -653,9 +650,7 @@ def seed_demo_sessions(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
     print(f"  [OK]   Demo sessions: {inserted} inserted, {skipped} updated")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # MAIN
-# ══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
     print("\n" + "=" * 60)
@@ -663,7 +658,7 @@ def main() -> None:
     print("  PSBs Hackathon 2026 | Team Vectora")
     print("=" * 60)
 
-    with SessionLocal() as db:
+    with session_local() as db:
         try:
             print("\n► Seeding Branches (3)...")
             branch_map = seed_branches(db)

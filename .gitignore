@@ -1,36 +1,50 @@
-# Environment
+# Environment & Secrets (Security First)
 .env
+.env.*
+*.env
+*.pem
+*.key
+*.cert
+*.pfx
+*.p12
 
-# Python
+# Python Runtime & Caches
 __pycache__/
 *.py[cod]
-*.egg-info/
-dist/
-build/
-*.egg
+*$py.class
+.pytest_cache/
+.cache/
+
+# Dependencies & Packaging
 .venv/
 venv/
+ENV/
+env/
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
 
-# Storage (generated at runtime)
+# Generated Runtime Storage & Databases
 storage/
-
-# ML Models (too large for git)
 models/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-*.egg
-.venv/
-venv/
+*.db
+*.sqlite
+*.sqlite3
 
-# Storage (generated at runtime)
-storage/
-
-# IDE
+# IDEs & Editors
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
-# OS
+# Operating System Files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Note: backend/fonts/ and backend/assets/ are NOT ignored because they contain
+# the multilingual TrueType fonts and the brand logo required for PDF generation.

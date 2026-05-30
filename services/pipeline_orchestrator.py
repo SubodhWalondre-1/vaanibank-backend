@@ -91,7 +91,7 @@ _MARATHI_TO_HINDI_REPLACEMENTS: tuple[tuple[str, str], ...] = (
 )
 
 
-# ── Intent keyword detection (shared between both endpoints) ──────────────────
+# Intent keyword detection (shared between both endpoints)
 
 from services.llm_utils import (
     pre_detect_intent,
@@ -101,7 +101,7 @@ from services.llm_utils import (
 )
 
 
-# ── RAG Knowledge Base Loader ──────────────────────────────────────────────────
+# RAG Knowledge Base Loader
 
 @lru_cache(maxsize=1)
 def _load_ubi_kb_yaml_cached() -> dict:
@@ -193,7 +193,7 @@ async def _load_ubi_knowledge_base(intent: str = "general") -> str:
         return ""
 
 
-# ── Result dataclass ──────────────────────────────────────────────────────────
+# Result dataclass
 
 @dataclass
 class PipelineResult:
@@ -214,9 +214,7 @@ class PipelineResult:
     response_time_ms: int
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # CORE PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
 
 async def run_transcription_pipeline(
     *,
@@ -246,28 +244,45 @@ async def run_transcription_pipeline(
     """
     start_time = time.time()
     session_updates: Dict[str, Any] = {}
+    # Fetch Dynamic Settings
+    from services.settings_service import settings_service
+    dyn_settings = await settings_service.get_all_settings()
 
-    # ── 1. STT ────────────────────────────────────────────────────────────────
-    stt_result = await ai_service.transcribe(
-        audio_bytes=audio_bytes,
-        language_code=language_code,
-        session_id=session_id,
-    )
-
-    elapsed_ms = int((time.time() - start_time) * 1000)
-
-    # ── 2. Determine exchange number ──────────────────────────────────────────
+    # 2. Determine exchange number
     if exchange_number is None:
         count_result = await db.execute(
             select(func.count(Exchange.id)).where(Exchange.session_id == session_id)
         )
         exchange_number = (count_result.scalar() or 0) + 1
 
-    # ── 3. Save audio file ────────────────────────────────────────────────────
+    # Enforce maximum exchanges per session
+    max_exchanges = dyn_settings.get("max_exchanges_per_session", 50)
+    if exchange_number > max_exchanges:
+        from fastapi import HTTPException
+        logger.warning(
+            "Session exchange limit reached | session=%s | exchanges=%d | max=%d",
+            session_id, exchange_number, max_exchanges
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Session exchange limit of {max_exchanges} reached. Please end this session and start a new one."
+        )
+
+    # 1. STT
+    stt_result = await ai_service.transcribe(
+        audio_bytes=audio_bytes,
+        language_code=language_code,
+        session_id=session_id,
+        skip_pii=not dyn_settings.get("pii_detection", True),
+    )
+
+    elapsed_ms = int((time.time() - start_time) * 1000)
+
+    # 3. Save audio file
     audio_filename = f"cust_{session_id}_{exchange_number}_{int(time.time())}.wav"
     audio_url = await storage_service.upload_audio_bytes(audio_bytes, audio_filename)
 
-    # ── 4. Save Exchange to DB ────────────────────────────────────────────────
+    # 4. Save Exchange to DB
     exchange = Exchange(
         session_id=session_id,
         exchange_number=exchange_number,
@@ -284,7 +299,7 @@ async def run_transcription_pipeline(
     db.add(exchange)
     await db.flush()
 
-    # ── 5. Log PII ────────────────────────────────────────────────────────────
+    # 5. Log PII
     if stt_result.pii_detected:
         for pii_type in stt_result.pii_types:
             db.add(
@@ -304,16 +319,16 @@ async def run_transcription_pipeline(
         session_updates["pii_detected"] = True
         session_updates["pii_types_found"] = merged_pii
 
-    # ── 6. Update session metadata ────────────────────────────────────────────
+    # 6. Update session metadata
     session_updates["stt_model_used"] = stt_result.model_used
     session_updates["total_exchanges"] = exchange_number
     # Note: deferred commit — all DB writes (exchange, PII, session metadata,
     # LLM results, collected_info) are committed in a single round-trip below.
 
-    # ── 7. Broadcast customer_speaking indicator ──────────────────────────────
+    # 7. Broadcast customer_speaking indicator
     await ws_manager.broadcast_customer_speaking(token_number)
 
-    # ── 8. LLM processing ────────────────────────────────────────────────────
+    # 8. LLM processing
     translation = stt_result.masked_text or stt_result.text
     sentiment = "calm"
     intent = "general"
@@ -342,7 +357,7 @@ async def run_transcription_pipeline(
         # Pre-detect intent from keywords
         pre_intent = pre_detect_intent(customer_text_for_ai)
 
-        # ── RAG: Retrieve grounded banking knowledge for this query ──────────
+        # RAG: Retrieve grounded banking knowledge for this query
         # Runs between pre_detect_intent() and process_with_llm() so the LLM
         # receives bank-policy context before generating any suggestion.
         # Uses masked_text to avoid sending PII to the embedding model.
@@ -364,31 +379,31 @@ async def run_transcription_pipeline(
         )
         rag_context_block = rag_service.format_context_for_llm(_rag_result)
 
-        # ── Inject Official UBI Knowledge Base ───────────────────────────────
+        # Inject Official UBI Knowledge Base
         _ubi_kb_ctx = await _load_ubi_knowledge_base(intent=pre_intent)
         if _ubi_kb_ctx:
             if not rag_context_block:
                 rag_context_block = _ubi_kb_ctx
             else:
                 rag_context_block = f"{_ubi_kb_ctx}\n\n{rag_context_block}"
-        # ── End RAG ──────────────────────────────────────────────────────────
+        # End RAG
 
-        # ── DRV Trigger A: Inject missing-document context into LLM ──────
+        # DRV Trigger A: Dynamic system and session state context collection
         from services.document_service import get_missing_doc_prompt_context, compute_readiness
         doc_gap_ctx = get_missing_doc_prompt_context(pre_intent, prev_collected)
-        if doc_gap_ctx:
-            # FIX: conversation_history is List[Dict], not str — inject as system message
-            conversation_history.append({"role": "user", "content": doc_gap_ctx})
 
-        # ── Full Session State Injection: Give LLM awareness of InfoBoard,
-        #    Process Panel, and Navigator phase so it doesn't repeat stale questions ──
         _session_state_ctx = build_session_state_context(
             intent=pre_intent,
             collected_info=prev_collected,
             exchange_count=exchange_number,
         )
+
+        system_context_parts = []
+        if doc_gap_ctx:
+            system_context_parts.append(doc_gap_ctx)
         if _session_state_ctx:
-            conversation_history.append({"role": "user", "content": _session_state_ctx})
+            system_context_parts.append(_session_state_ctx)
+        system_context_str = "\n\n".join(system_context_parts)
 
         llm_result = await ai_service.process_with_llm(
             text=customer_text_for_ai,
@@ -396,19 +411,19 @@ async def run_transcription_pipeline(
             detected_intent=pre_intent,
             conversation_history=conversation_history,
             rag_context=rag_context_block,   # grounded KB context injected here
+            system_context=system_context_str,
         )
 
-        # ═══ DEBUG: Trace InfoBoard pipeline ═══
-        print(f"\n{'='*60}")
-        print(f"[DEBUG] LLM completed successfully")
-        print(f"[DEBUG] collected_info type: {type(llm_result.collected_info)}")
-        print(f"[DEBUG] collected_info value: {llm_result.collected_info}")
-        print(f"[DEBUG] collected_info is not None: {llm_result.collected_info is not None}")
-        print(f"[DEBUG] next_question_hindi: '{llm_result.next_question_hindi}'")
-        print(f"[DEBUG] intent: {llm_result.intent}")
-        print(f"[DEBUG] conversation_stage: {llm_result.conversation_stage}")
-        print(f"[DEBUG] prev_collected: {prev_collected}")
-        print(f"{'='*60}\n")
+        # Trace LLM result for debugging
+        logger.debug(
+            "LLM pipeline complete | collected_info=%s | intent=%s | "
+            "stage=%s | next_q=%s | prev_collected=%s",
+            llm_result.collected_info,
+            llm_result.intent,
+            llm_result.conversation_stage,
+            llm_result.next_question_hindi[:60] if llm_result.next_question_hindi else "(none)",
+            prev_collected,
+        )
 
         # Update exchange with translation + sentiment + intent
         await db.execute(
@@ -425,7 +440,7 @@ async def run_transcription_pipeline(
         session_updates["sentiment_overall"] = llm_result.sentiment
         session_updates["intent_detected"] = llm_result.intent
 
-        # ── Conversation Intelligence board ───────────────────────────────────
+        # Conversation Intelligence board
         merged_info = None
         if llm_result.collected_info is not None or llm_result.next_question_hindi:
             merged_info = _merge_collected_info(prev_collected, llm_result.collected_info or {})
@@ -450,11 +465,11 @@ async def run_transcription_pipeline(
                 .values(**session_updates)
             )
 
-        # ── SINGLE COMMIT — all DB mutations in one round-trip (P2 B-HIGH-1) ──
+        # SINGLE COMMIT — all DB mutations in one round-trip (P2 B-HIGH-1)
         await db.commit()
         await db.refresh(exchange)
 
-        # ── Verify LLM translation. If the model echoes the customer's source
+        # Verify LLM translation. If the model echoes the customer's source
         # language, force a dedicated source-language → Hindi translation before
         # the staff panel sees the red "Hindi" block.
         _hindi_translation = llm_result.translation
@@ -513,7 +528,7 @@ async def run_transcription_pipeline(
 
         translation = _hindi_translation
 
-        # ── Broadcast to staff panel ──────────────────────────────────────────
+        # Broadcast to staff panel
         await ws_manager.broadcast_transcription(
             token_number=token_number,
             text_original=stt_result.text,
@@ -524,8 +539,8 @@ async def run_transcription_pipeline(
             pii_detected=stt_result.pii_detected,
             exchange_id=exchange.id,
         )
-        # ── Context-Aware Suggestion: Override LLM suggestion if navigator
-        #    detects all fields collected + all docs confirmed ──────────────
+        # Context-Aware Suggestion: Override LLM suggestion if navigator
+        # detects all fields collected + all docs confirmed
         _final_hindi = llm_result.suggested_response_hindi
         _final_customer = llm_result.suggested_response_customer_lang
         _final_intent = llm_result.intent or pre_intent
@@ -570,9 +585,9 @@ async def run_transcription_pipeline(
             exchange_id=exchange.id,
         )
 
-        # ── Broadcast info board update (after commit, so data is persisted) ──
+        # Broadcast info board update (after commit, so data is persisted)
         if merged_info is not None:
-            # ── Deterministic Navigator: compute phase + next question ──
+            # Deterministic Navigator: compute phase + next question
             from services.session_navigator import compute_next_actions
             from services.document_service import compute_readiness
             _nav_intent = llm_result.intent or pre_intent
@@ -610,14 +625,14 @@ async def run_transcription_pipeline(
                 },
             )
 
-            # ── Navigator state → staff panel ──
+            # Navigator state → staff panel
             await ws_manager.send_to_staff(
                 token_number,
                 "navigator_update",
                 nav_state,
             )
 
-            # ── AUTO TRIGGER: All info + docs collected → send customer notification ──
+            # AUTO TRIGGER: All info + docs collected → send customer notification
             # Fires once per session (Redis guard inside broadcast_all_info_collected)
             _all_complete = nav_state.get("all_complete", False)
             _doc_ready = _doc_score >= 80  # 80% docs = enough to start verification
@@ -641,7 +656,7 @@ async def run_transcription_pipeline(
                         token_number, _aic_exc,
                     )
 
-            # ── DRV Trigger B: Update doc readiness after each info_board_update ──
+            # DRV Trigger B: Update doc readiness after each info_board_update
             _drv_intent = llm_result.intent or pre_intent
             if _drv_intent and _drv_intent.upper() not in ("GENERAL", ""):
                 from services.document_service import build_checklist, compute_readiness
@@ -656,7 +671,7 @@ async def run_transcription_pipeline(
                 except Exception as drv_exc:
                     logger.debug("DRV trigger B failed (non-fatal): %s", drv_exc)
 
-        # ── Auto-step completion ──────────────────────────────────────────────
+        # Auto-step completion
         if llm_result.auto_step_completed:
             await _handle_auto_step_completion(
                 db=db,
@@ -667,7 +682,7 @@ async def run_transcription_pipeline(
                 source_label=source_label,
             )
 
-        # ── Intent Engine PROCESS_UPDATE ──────────────────────────────────────
+        # Intent Engine PROCESS_UPDATE
         if llm_result.intent and llm_result.intent.upper() not in ("GENERAL", ""):
             await _broadcast_intent_engine_update(
                 stt_text=stt_result.text,
@@ -676,7 +691,7 @@ async def run_transcription_pipeline(
                 source_label=source_label,
             )
 
-        # ── PII alert ─────────────────────────────────────────────────────────
+        # PII alert
         if stt_result.pii_detected:
             await ws_manager.broadcast_pii_alert(
                 token_number=token_number,
@@ -685,7 +700,7 @@ async def run_transcription_pipeline(
                 exchange_id=exchange.id,
             )
 
-        # ── Process step initialization ───────────────────────────────────────
+        # Process step initialization
         if llm_result.process_triggered:
             from routers._pipeline_helpers import initialize_process_steps
             await initialize_process_steps(
@@ -696,7 +711,7 @@ async def run_transcription_pipeline(
                 db=db,
             )
 
-            # ── DRV Trigger C: Send initial checklist when process starts ─────
+            # DRV Trigger C: Send initial checklist when process starts
             from services.document_service import build_checklist, compute_readiness
             try:
                 _drv_i = llm_result.intent or "general"
@@ -721,13 +736,13 @@ async def run_transcription_pipeline(
 
     except Exception as exc:
         import traceback
-        print(f"\n{'='*60}")
-        print(f"[DEBUG] ❌ PIPELINE EXCEPTION CAUGHT!")
-        print(f"[DEBUG] Error type: {type(exc).__name__}")
-        print(f"[DEBUG] Error message: {exc}")
-        print(f"[DEBUG] Full traceback:")
-        traceback.print_exc()
-        print(f"{'='*60}\n")
+        logger.error(
+            "Pipeline exception | error_type=%s | error=%s | source=%s",
+            type(exc).__name__,
+            str(exc)[:300],
+            source_label,
+            exc_info=True,
+        )
         logger.warning("LLM processing failed during %s transcribe: %s", source_label, exc)
         
         # Save whatever STT and Session metadata updates we successfully collected before the failure
@@ -772,9 +787,7 @@ async def run_transcription_pipeline(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PRIVATE HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _normalise_for_retry_compare(text: str) -> str:
     """Keep only letters/digits so tiny punctuation or spacing shifts still match."""
@@ -845,7 +858,7 @@ def _fallback_source_to_hindi(text: str, source_language_code: str) -> Optional[
     return translated
 
 
-# ── Stale-suggestion detection patterns ──────────────────────────────────────
+# Stale-suggestion detection patterns
 
 _STALE_DOC_PATTERNS = [
     "aadhaar card", "aadhar card", "आधार कार्ड", "आधार",
@@ -938,7 +951,7 @@ def _merge_collected_info(
         if v is not None and v != "" and v is not False:
             merged[k] = v
 
-    # ── MAPPING: Sync LLM keys to SaralForm canonical keys ──
+    # MAPPING: Sync LLM keys to SaralForm canonical keys
     # This ensures that fields extracted as 'monthly_income' also populate 'net_salary'
     # which is the key expected by LoanForm.jsx / FIELD_LABELS.
     MAPPINGS = {
@@ -1056,7 +1069,7 @@ async def _handle_auto_step_completion(
             matched_step.step_text_hindi[:40], done, total,
         )
 
-        # ── All steps completed → send verification time message ──────────
+        # All steps completed → send verification time message
         if done == total and total > 0:
             try:
                 from models import Session as SessionModel

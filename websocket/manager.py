@@ -43,14 +43,14 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
         self.greeted_tokens: set[str] = set()
         self._redis: Any = None
 
-        # ── Streaming audio state (per session token) ──────────────────────────
+        # Streaming audio state (per session token)
         self._audio_buffers: Dict[str, list[bytes]] = {}
         self._audio_lang: Dict[str, str] = {}
         self._audio_session_id: Dict[str, int] = {}
         self._partial_stt_running: Dict[str, bool] = {}
         self._last_partial_ts: Dict[str, float] = {}
 
-    # ── Redis lazy accessor ────────────────────────────────────────────────────
+    # Redis lazy accessor
 
     async def _get_redis(self):
         if self._redis is None:
@@ -58,15 +58,13 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
             self._redis = await get_redis_client()
         return self._redis
 
-    # ── DB session helper ──────────────────────────────────────────────────────
+    # DB session helper
 
     async def _get_db(self) -> AsyncSession:
         from database import AsyncSessionLocal
         return AsyncSessionLocal()
 
-    # ══════════════════════════════════════════════════════════════════════════
     # SEND HELPERS
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def send_to_staff(
         self, token_number: str, event_type: str, data: Dict[str, Any]
@@ -120,9 +118,7 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
             _event("error", {"code": code, "message": message}),
         )
 
-    # ══════════════════════════════════════════════════════════════════════════
     # BROADCAST METHODS
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def broadcast_transcription(
         self,
@@ -436,7 +432,7 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
 
         event: all_info_collected → customer only (text + audio).
         """
-        # ── Redis guard — only send once per session ───────────────────────────
+        # Redis guard — only send once per session
         _redis_key = f"all_info_collected_sent:{token_number}"
         try:
             redis = await self._get_redis()
@@ -453,7 +449,7 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
         except Exception as redis_exc:
             logger.warning("Redis guard check failed (will send anyway): %s", redis_exc)
 
-        # ── Multilingual messages ─────────────────────────────────────────────
+        # Multilingual messages
         _ALL_COLLECTED_MESSAGES = {
             "hi": "🎉 आपकी सारी जानकारी और दस्तावेज़ इकट्ठी कर ली गई है। हम अभी आपकी verification process शुरू कर रहे हैं। आपको कहीं जाने की ज़रूरत नहीं, हम जल्द ही आपको update देंगे।",
             "mr": "🎉 तुमची सर्व माहिती आणि कागदपत्रे गोळा केली गेली आहेत। आम्ही आता तुमची verification प्रक्रिया सुरू करत आहोत। तुम्हाला कुठेही जाण्याची गरज नाही, आम्ही लवकरच तुम्हाला update देऊ.",
@@ -473,7 +469,7 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
             short_lang, _ALL_COLLECTED_MESSAGES["en"]
         )
 
-        # ── Send text to customer panel ────────────────────────────────────────
+        # Send text to customer panel
         await self.send_to_customer(
             token_number,
             "all_info_collected",
@@ -501,7 +497,7 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
             token_number, short_lang, intent,
         )
 
-        # ── Generate TTS + send audio to customer ─────────────────────────────
+        # Generate TTS + send audio to customer
         try:
             from services.ai_service import ai_service
             tts_result = await ai_service.generate_tts(
@@ -526,5 +522,5 @@ class ConnectionManager(ConnectionMixin, AudioPipelineMixin, HandlersMixin):
             )
 
 
-# ── Module-level singleton ─────────────────────────────────────────────────────
+# Module-level singleton
 ws_manager = ConnectionManager()

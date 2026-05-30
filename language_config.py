@@ -8,7 +8,7 @@ Used by: intent_engine.py, process_loader.py, websocket/manager.py
 
 from __future__ import annotations
 
-# ── Language registry ────────────────────────────────────────────────────────
+# Language registry
 # key  : BCP-47 short code (what Sarvam STT returns)
 # value: name, tts_voice (Sarvam Bulbul v3 format), display name
 
@@ -26,7 +26,7 @@ LANGUAGE_CONFIG: dict[str, dict] = {
     "en": {"name": "English",   "tts_voice": "en-IN", "display": "English"},
 }
 
-# ── Intent registry ───────────────────────────────────────────────────────────
+# Intent registry
 SUPPORTED_INTENTS: list[str] = [
     "HOME_LOAN",
     "PERSONAL_LOAN",

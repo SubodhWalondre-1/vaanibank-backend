@@ -21,9 +21,7 @@ import logging
 import sys
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
 # Bootstrap: ensure backend/ root is importable so services can be imported
-# ---------------------------------------------------------------------------
 _BACKEND_DIR = Path(__file__).resolve().parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))

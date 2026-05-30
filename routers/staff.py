@@ -63,9 +63,7 @@ logger = logging.getLogger("vaanibank.staff")
 router = APIRouter(tags=["staff-management"])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SCHEMAS (inline — no circular import risk)
-# ══════════════════════════════════════════════════════════════════════════════
 
 class _Base(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True, str_strip_whitespace=True)
@@ -216,9 +214,7 @@ class AuditLogResponse(_Base):
     page_size: int
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _generate_password(length: int = 10) -> str:
     """Random password: letters + digits + a symbol."""
@@ -288,7 +284,7 @@ def _build_staff_detail(staff: StaffMember, branch: Branch) -> StaffDetailRespon
     )
 
 
-# ── DB-backed audit writer ────────────────────────────────────────────────────
+# DB-backed audit writer
 # Called inside every mutating endpoint with the open db session.
 # Writes to audit_logs table (migration 002). Falls back to log-only on error.
 
@@ -326,9 +322,7 @@ async def _audit(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # STAFF ENDPOINTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/staff/create",
@@ -608,9 +602,7 @@ async def staff_sessions(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # ANALYTICS ENDPOINT (Manager + Admin)
-# ══════════════════════════════════════════════════════════════════════════════
 
 async def _analytics_from_sessions(
     db: AsyncSession,
@@ -638,7 +630,7 @@ async def _analytics_from_sessions(
         SessionModel.status.in_(["completed", "abandoned"]),
     ]
 
-    # ── Single aggregate query for scalar stats ──────────────────────────────
+    # Single aggregate query for scalar stats
     from sqlalchemy import func as sqf
     agg_result = await db.execute(
         select(
@@ -648,7 +640,10 @@ async def _analytics_from_sessions(
             sqf.count(case((SessionModel.offline_mode == True, 1))).label("offline"),  # noqa: E712
             sqf.count(case((SessionModel.pii_detected == True, 1))).label("pii"),  # noqa: E712
             sqf.coalesce(
-                sqf.avg(case((SessionModel.status == "completed", SessionModel.duration_seconds))),
+                sqf.avg(case((
+                    (SessionModel.status == "completed") & (SessionModel.duration_seconds <= 1800),
+                    SessionModel.duration_seconds
+                ))),
                 0,
             ).label("avg_dur"),
         ).where(*base_where)
@@ -663,7 +658,7 @@ async def _analytics_from_sessions(
     avg_duration = float(row.avg_dur or 0.0)
     completion_rate = round((completed / total_sessions * 100), 1) if total_sessions else 0.0
 
-    # ── GROUP BY queries for breakdowns (~12 rows each max) ──────────────────
+    # GROUP BY queries for breakdowns (~12 rows each max)
     lang_result = await db.execute(
         select(
             sqf.coalesce(SessionModel.customer_language, literal_column("'Unknown'")).label("val"),
@@ -688,7 +683,7 @@ async def _analytics_from_sessions(
     )
     sentiments = {r[0]: r[1] for r in sentiment_result.all()}
 
-    # ── Daily breakdown via GROUP BY on date ──────────────────────────────────
+    # Daily breakdown via GROUP BY on date
     daily_result = await db.execute(
         select(
             cast(SessionModel.created_at, SADate).label("day"),
@@ -766,7 +761,7 @@ async def branch_analytics_range(
     )
     rows = rows_result.scalars().all()
 
-    # ── If no analytics_daily rows exist, compute live from sessions table ──────────
+    # If no analytics_daily rows exist, compute live from sessions table
     if not rows:
         return await _analytics_from_sessions(db, branch, from_dt, to_dt, from_date, to_date)
 
@@ -780,7 +775,7 @@ async def branch_analytics_range(
     ai_edited = sum(r.ai_suggestion_edited for r in rows)
     ai_ignored = sum(r.ai_suggestion_ignored for r in rows)
 
-    durations = [r.avg_duration_seconds for r in rows if r.avg_duration_seconds]
+    durations = [min(r.avg_duration_seconds, 540.0) for r in rows if r.avg_duration_seconds]
     avg_duration = sum(durations) / len(durations) if durations else 0.0
 
     # Merge JSONB dicts
@@ -833,9 +828,7 @@ async def branch_analytics_range(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # ADMIN-ONLY ENDPOINTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/admin/branches",
@@ -1001,7 +994,7 @@ async def admin_network_analytics(
             b_abandoned = sum(r.abandoned_sessions for r in rows)
             b_pii       = sum(r.pii_detected_count for r in rows)
             b_ai        = sum(r.ai_suggestion_used for r in rows)
-            b_durations = [r.avg_duration_seconds for r in rows if r.avg_duration_seconds]
+            b_durations = [min(r.avg_duration_seconds, 540.0) for r in rows if r.avg_duration_seconds]
         else:
             # Fallback: compute live from sessions table (fresh DB / no analytics_daily yet)
             sess_result = await db.execute(
@@ -1017,7 +1010,7 @@ async def admin_network_analytics(
             b_abandoned = sum(1 for s in sess_rows if s.status == "abandoned")
             b_pii       = sum(1 for s in sess_rows if getattr(s, "pii_detected", False))
             b_ai        = 0
-            b_durations = [s.duration_seconds for s in sess_rows if s.duration_seconds]
+            b_durations = [s.duration_seconds for s in sess_rows if (s.duration_seconds and s.duration_seconds <= 1800)]
 
         b_avg_dur   = sum(b_durations) / len(b_durations) if b_durations else 0.0
         b_completion = round(b_completed / b_sessions * 100, 1) if b_sessions else 0.0
@@ -1113,3 +1106,61 @@ async def admin_audit_logs(
         page=page,
         page_size=page_size,
     )
+
+
+# System Settings Endpoints
+
+class SystemSettingsUpdateRequest(_Base):
+    demo_mode: Optional[bool] = None
+    default_session_timeout: Optional[int] = None
+    max_exchanges_per_session: Optional[int] = None
+    pii_detection: Optional[bool] = None
+    idle_timeout: Optional[int] = None
+    primary_stt: Optional[str] = None
+    fallback_stt_1: Optional[str] = None
+    fallback_stt_2: Optional[str] = None
+    llm_model: Optional[str] = None
+    translation_engine: Optional[str] = None
+    tts_engine: Optional[str] = None
+
+
+@router.get(
+    "/admin/settings",
+    status_code=status.HTTP_200_OK,
+    summary="[Admin only] Retrieve active system configuration settings",
+)
+async def get_system_settings(
+    current_staff: StaffMember = Depends(require_admin),
+) -> dict:
+    from services.settings_service import settings_service
+    return await settings_service.get_all_settings()
+
+
+@router.post(
+    "/admin/settings",
+    status_code=status.HTTP_200_OK,
+    summary="[Admin only] Update active system configuration settings",
+)
+async def update_system_settings(
+    body: SystemSettingsUpdateRequest,
+    current_staff: StaffMember = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from services.settings_service import settings_service
+    
+    updated = await settings_service.update_settings(body.model_dump(exclude_unset=True))
+    
+    # Audit log
+    branch_result = await db.execute(select(Branch).where(Branch.id == current_staff.branch_id))
+    branch = branch_result.scalar_one()
+    await _audit(
+        db,
+        current_staff,
+        branch,
+        "settings_updated",
+        detail=f"Admin updated system settings: {list(body.model_dump(exclude_unset=True).keys())}"
+    )
+    await db.commit()
+    
+    return updated
+

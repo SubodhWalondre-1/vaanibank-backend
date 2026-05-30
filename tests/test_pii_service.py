@@ -15,9 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from services.pii_service import pii_service, PIIResult
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # AADHAAR TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestAadhaarDetection:
     def test_aadhaar_with_spaces(self):
@@ -43,9 +41,7 @@ class TestAadhaarDetection:
         assert "aadhaar" not in result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PAN TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestPANDetection:
     def test_valid_pan(self):
@@ -66,9 +62,7 @@ class TestPANDetection:
         assert "pan" not in result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PHONE TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestPhoneDetection:
     def test_valid_indian_mobile(self):
@@ -89,9 +83,7 @@ class TestPhoneDetection:
         assert "phone" not in result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # ACCOUNT NUMBER TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestAccountNumberDetection:
     def test_account_with_context(self):
@@ -111,9 +103,7 @@ class TestAccountNumberDetection:
         assert "account_number" in result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # DOB TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestDOBDetection:
     def test_dob_slash_format(self):
@@ -143,9 +133,7 @@ class TestDOBDetection:
         assert "dob" not in result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # COMBINED / EDGE CASE TESTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TestCombined:
     def test_multiple_pii_types(self):

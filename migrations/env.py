@@ -17,7 +17,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# ── Project imports ────────────────────────────────────────────────────────────
+# Project imports
 # database.Base must be imported before models so the declarative registry exists
 from database import Base  # noqa: F401
 
@@ -35,10 +35,10 @@ from models import (  # noqa: F401
     StaffMember,
 )
 
-# ── Config from config.py ──────────────────────────────────────────────────────
+# Config from config.py
 from config import settings
 
-# ── Alembic Config object ──────────────────────────────────────────────────────
+# Alembic Config object
 config = context.config
 
 # Override sqlalchemy.url with the value from our settings singleton
@@ -48,6 +48,7 @@ _async_url = settings.DATABASE_URL.replace(
 ).replace(
     "postgresql+psycopg2://", "postgresql+asyncpg://"
 )
+print("ALEMBIC TARGET URL:", _async_url.split("@")[-1] if "@" in _async_url else _async_url)
 config.set_main_option("sqlalchemy.url", _async_url)
 
 # Interpret the config file for Python logging
@@ -58,7 +59,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-# ── Offline migrations (generate SQL scripts without DB connection) ────────────
+# Offline migrations (generate SQL scripts without DB connection)
 
 def run_migrations_offline() -> None:
     """
@@ -79,7 +80,7 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-# ── Online migrations (run against live DB) ───────────────────────────────────
+# Online migrations (run against live DB)
 
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
@@ -111,7 +112,7 @@ def run_migrations_online() -> None:
     asyncio.run(run_async_migrations())
 
 
-# ── Entry point dispatch ───────────────────────────────────────────────────────
+# Entry point dispatch
 
 if context.is_offline_mode():
     run_migrations_offline()

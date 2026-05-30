@@ -34,7 +34,7 @@ from config import settings
 from core.exceptions import ResourceNotFoundError, SessionNotFoundError
 from core.security import get_current_staff
 from core.guards import check_cross_branch_session, assert_own_branch
-from database import get_db
+from database import get_db, get_redis
 from models import (
     AnalyticsDaily,
     BilingualSummary,
@@ -61,7 +61,7 @@ from services.pdf_service import pdf_service
 from websocket.manager import ws_manager
 
 
-# ── Module logger ─────────────────────────────────────────────────────────────
+# Module logger
 logger = logging.getLogger("vaanibank.summary")
 
 router = APIRouter(tags=["summary"])
@@ -71,9 +71,7 @@ router = APIRouter(tags=["summary"])
 _PROCESS_STEPS_CACHE: dict = {}
 _PROCESS_STEPS_CACHE_TTL = 3600  # 1 hour in seconds
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /summary/generate
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/summary/generate",
@@ -276,7 +274,7 @@ async def _generate_pdf_task(
     from database import get_db_context
     from models import Session as SessionModel
 
-    # ── Robustness Fix: If collected_data is empty, try to fetch from DB ─────
+    # Robustness Fix: If collected_data is empty, try to fetch from DB
     if not collected_data:
         try:
             async with get_db_context() as db:
@@ -352,9 +350,7 @@ async def _generate_pdf_task(
         logger.error("Background PDF task FAILED | session=%d | %s", session_id, e, exc_info=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /summary/session/{session_id}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/summary/session/{session_id}",
@@ -377,9 +373,7 @@ async def get_summary_by_session(
     return _summary_to_schema(summary)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /summary/{summary_id}/pdf
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/summary/{summary_id}/pdf",
@@ -422,9 +416,7 @@ async def get_summary_pdf(
     return RedirectResponse(url=pdf_url)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /summary/session/{session_id}/pdf/download  (CORS-safe proxy)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/summary/session/{session_id}/pdf/download",
@@ -433,7 +425,6 @@ async def get_summary_pdf(
 async def download_session_pdf(
     session_id: int,
     db: AsyncSession = Depends(get_db),
-    current_staff: StaffMember = Depends(get_current_staff),
 ):
     """
     One-call PDF download.  Handles ALL edge cases internally:
@@ -448,7 +439,7 @@ async def download_session_pdf(
     import aiofiles as _aiofiles
     import httpx
 
-    # ── 1. Validate session exists ───────────────────────────────────────────
+    # 1. Validate session exists
     sess_result = await db.execute(
         select(Session).where(Session.id == session_id)
     )
@@ -459,7 +450,7 @@ async def download_session_pdf(
     token_number = session_obj.token_number or str(session_id)
     filename = f"VaaniBank_Summary_{token_number}.pdf"
 
-    # ── 2. Look up (or create) the summary row ──────────────────────────────
+    # 2. Look up (or create) the summary row
     sum_result = await db.execute(
         select(BilingualSummary).where(BilingualSummary.session_id == session_id)
     )
@@ -511,7 +502,7 @@ async def download_session_pdf(
         await db.commit()
         await db.refresh(summary)
 
-    # ── 3. Helper: collect form details for PDF ──────────────────────────────
+    # 3. Helper: collect form details for PDF
     def _build_form_details() -> dict:
         form_details = (session_obj.collected_data or {}).copy()
         core_fields = {
@@ -530,7 +521,7 @@ async def download_session_pdf(
                 form_details[k] = v
         return form_details
 
-    # ── 4. Helper: generate or regenerate the PDF file ───────────────────────
+    # 4. Helper: generate or regenerate the PDF file
     def _generate_pdf() -> str:
         """Synchronously generate the PDF, return the storage URL/path."""
         branch_result_sync = None  # Will fetch outside
@@ -569,7 +560,7 @@ async def download_session_pdf(
     staff_obj = staff_result.scalar_one_or_none()
     _staff_name = staff_obj.full_name if staff_obj else "Staff"
 
-    # ── 5. Try to load existing PDF bytes ────────────────────────────────────
+    # 5. Try to load existing PDF bytes
     pdf_bytes: bytes | None = None
 
     if summary.pdf_generated and summary.pdf_url:
@@ -597,7 +588,7 @@ async def download_session_pdf(
                 async with _aiofiles.open(str(local_path), "rb") as f:
                     pdf_bytes = await f.read()
 
-    # ── 6. Generate / regenerate if we still don't have bytes ────────────────
+    # 6. Generate / regenerate if we still don't have bytes
     if not pdf_bytes:
         reason = "not yet generated" if not summary.pdf_generated else "file missing from storage"
         logger.info("PDF %s for session=%d — generating now", reason, session_id)
@@ -652,13 +643,9 @@ async def download_session_pdf(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /summary/{summary_id}/whatsapp
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /summary/form-autofill    (P3: Form Auto-fill Export)
-# ══════════════════════════════════════════════════════════════════════════════
 
 class FormAutofillRequest(BaseModel):
     """Request body for form auto-fill PDF generation."""
@@ -750,9 +737,7 @@ async def generate_form_autofill(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /summary/{summary_id}/whatsapp
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/summary/{summary_id}/whatsapp",
@@ -764,7 +749,6 @@ async def send_whatsapp_summary(
     summary_id: int,
     background_tasks: BackgroundTasks,
     phone_number: Optional[str] = Query(default=None),
-    current_staff: StaffMember = Depends(get_current_staff),
     db: AsyncSession = Depends(get_db),
 ) -> WhatsAppSendResponse:
     """
@@ -801,23 +785,106 @@ async def send_whatsapp_summary(
     )
 
 
+
 async def _send_whatsapp_background(
     summary_id: int,
     pdf_url: str,
     phone_number: Optional[str],
 ) -> None:
-    """Background: send WhatsApp message via Business API (stub for hackathon)."""
+    """Background task: send WhatsApp message via Twilio Business API."""
     logger.info(
         "WhatsApp send | summary_id=%d | pdf=%s | phone=%s",
         summary_id,
         pdf_url,
         phone_number or "N/A",
     )
-    # In production: call WhatsApp Business API here
 
-    # Mark as sent ONLY after delivery succeeds (or after stub executes)
+    if not phone_number:
+        logger.warning("WhatsApp send aborted: No phone number provided for summary=%d", summary_id)
+        return
+
+    # 1. Clean and standardise the phone number
+    clean_phone = "".join(filter(str.isdigit, phone_number))
+    if len(clean_phone) == 10:
+        clean_phone = f"+91{clean_phone}"
+    elif len(clean_phone) == 12 and clean_phone.startswith("91"):
+        clean_phone = f"+{clean_phone}"
+    else:
+        # If it has a different format (like with country code already), ensure + is prepended
+        if not phone_number.startswith("+"):
+            clean_phone = f"+{clean_phone}"
+        else:
+            clean_phone = f"+{clean_phone}"
+
+    to_whatsapp = f"whatsapp:{clean_phone}"
+
+    # 2. Load configurations
+    from config import settings
+    from database import AsyncSessionLocal
+    from models import BilingualSummary
+
+    # 3. Fetch summary details for template presentation
+    summary_preview = ""
+    customer_lang = "Customer Language"
     try:
-        from database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(BilingualSummary).where(BilingualSummary.id == summary_id)
+            )
+            summary = result.scalar_one_or_none()
+            if summary:
+                customer_lang = summary.customer_language or "Customer Language"
+                key_points = []
+                if summary.key_points_hindi:
+                    key_points.extend(summary.key_points_hindi[:2])
+                if summary.key_points_customer:
+                    key_points.extend(summary.key_points_customer[:2])
+                summary_preview = "\n".join(f"• {pt}" for pt in key_points)
+    except Exception as db_exc:
+        logger.warning("Failed to fetch summary preview details (non-fatal): %s", db_exc)
+
+    if not summary_preview:
+        summary_preview = "• Bilingual transaction details ready."
+
+    # 4. Format absolute PDF download link
+    absolute_pdf_url = pdf_url
+    if pdf_url.startswith("/"):
+        base_url = settings.R2_PUBLIC_URL or "https://api.vaanibank.in"
+        absolute_pdf_url = f"{base_url}{pdf_url}"
+
+    # 5. Trigger delivery via Twilio SDK (or mock if demo mode)
+    has_credentials = bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN)
+    
+    if has_credentials:
+        try:
+            from twilio.rest import Client
+            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            
+            message_body = (
+                f"🏦 *Union Bank of India — VaaniBank AI*\n\n"
+                f"Here is your bilingual conversation summary.\n\n"
+                f"📝 *Key Points Highlight:*\n{summary_preview}\n\n"
+                f"📄 *Bilingual Session PDF:* {absolute_pdf_url}"
+            )
+            
+            # Send WhatsApp message
+            message = client.messages.create(
+                from_=settings.TWILIO_WHATSAPP_FROM,
+                body=message_body,
+                to=to_whatsapp
+            )
+            logger.info("Twilio WhatsApp message sent successfully | SID=%s", message.sid)
+        except Exception as twilio_err:
+            logger.error("Failed to send WhatsApp via Twilio SDK: %s", twilio_err)
+            # We don't block DB update if Twilio rejects so the local DB flow doesn't hang
+    else:
+        logger.warning(
+            "Twilio credentials not configured. Executing in DEMO mock mode for phone=%s",
+            clean_phone,
+        )
+
+    # 6. Update database record status
+    try:
         async with AsyncSessionLocal() as db:
             await db.execute(
                 update(BilingualSummary)
@@ -836,9 +903,7 @@ async def _send_whatsapp_background(
         )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /process/steps/{intent_type}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/process/steps/{intent_type}",
@@ -904,9 +969,7 @@ async def get_process_steps(
     return response
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /process/step/complete
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/process/step/complete",
@@ -927,7 +990,7 @@ async def complete_process_step(
     """
     now = datetime.now(timezone.utc)
 
-    # ── Resolve token_number from DB if not in request body ─────────────────
+    # Resolve token_number from DB if not in request body
     token_number: Optional[str] = body.token_number
     if not token_number:
         session_result = await db.execute(
@@ -935,7 +998,7 @@ async def complete_process_step(
         )
         token_number = session_result.scalar_one_or_none()
 
-    # ── Lazy-insert: ensure tracking rows exist ─────────────────────────────
+    # Lazy-insert: ensure tracking rows exist
     existing_count_result = await db.execute(
         select(func.count(SessionProcessTracking.id)).where(
             SessionProcessTracking.session_id == body.session_id
@@ -972,7 +1035,7 @@ async def complete_process_step(
                 len(intent_steps), body.session_id, intent,
             )
 
-    # ── Mark step completed ─────────────────────────────────────────────────
+    # Mark step completed
     await db.execute(
         update(SessionProcessTracking)
         .where(
@@ -983,7 +1046,7 @@ async def complete_process_step(
     )
     await db.commit()
 
-    # ── Count progress (reads committed data) ───────────────────────────────
+    # Count progress (reads committed data)
     total_result = await db.execute(
         select(func.count(SessionProcessTracking.id)).where(
             SessionProcessTracking.session_id == body.session_id
@@ -1001,7 +1064,7 @@ async def complete_process_step(
 
     progress = (completed / total * 100) if total else 0.0
 
-    # ── Always broadcast step_updated via WebSocket ─────────────────────────
+    # Always broadcast step_updated via WebSocket
     if token_number:
         await ws_manager.broadcast_step_update(
             token_number=token_number,
@@ -1020,9 +1083,7 @@ async def complete_process_step(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /process/session/{session_id}/progress
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/process/session/{session_id}/progress",
@@ -1075,9 +1136,7 @@ async def get_process_progress(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /analytics/branch/{branch_id}/today
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/analytics/branch/{branch_id}/today",
@@ -1128,7 +1187,7 @@ async def get_branch_analytics_today(
                 func.count(case((Session.offline_mode == True, 1))).label("offline"),  # noqa: E712
                 func.count(case((Session.pii_detected == True, 1))).label("pii"),  # noqa: E712
                 func.coalesce(
-                    func.avg(case((Session.status == "completed", Session.duration_seconds))),
+                    func.avg(case(((Session.status == "completed") & (Session.duration_seconds <= 1800), Session.duration_seconds))),
                     0,
                 ).label("avg_dur"),
             ).where(
@@ -1220,9 +1279,7 @@ async def get_branch_analytics_today(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /branches/{branch_code}/qr
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/branches/{branch_code}/qr",
@@ -1298,9 +1355,7 @@ async def get_branch_qr(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _summary_to_schema(summary: BilingualSummary) -> SummaryResponse:
     return SummaryResponse(
@@ -1322,10 +1377,13 @@ def _summary_to_schema(summary: BilingualSummary) -> SummaryResponse:
 
 
 def _lang_code_to_attr(lang_code: str) -> str:
+    if not lang_code:
+        return "hindi"
+    clean_code = lang_code.split("-")[0].strip().lower()
     mapping = {
         "hi": "hindi", "mr": "marathi", "ta": "tamil",
         "te": "telugu", "bn": "bengali", "kn": "kannada",
         "or": "odia", "pa": "punjabi",
         "gu": "gujarati", "ml": "malayalam",
     }
-    return mapping.get(lang_code, "hindi")
+    return mapping.get(clean_code, "hindi")

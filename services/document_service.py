@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("vaanibank.document_service")
 
-# ── Load DOCUMENT_REGISTRY from config/document_registry.py ──────────────────
+# Load DOCUMENT_REGISTRY from config/document_registry.py
 # The config/ directory is a data folder (no __init__.py), so we load via
 # importlib.util — same strategy as the YAML config loader in ai_service.py.
 _REGISTRY_PATH = Path(__file__).resolve().parent.parent / "config" / "document_registry.py"
@@ -190,7 +190,7 @@ def get_missing_doc_prompt_context(
     )
 
 
-# ── Internal helpers ─────────────────────────────────────────────────────────
+# Internal helpers
 
 def _is_truthy(val: Any) -> bool:
     """Check if a collected_info value means 'yes, provided'."""

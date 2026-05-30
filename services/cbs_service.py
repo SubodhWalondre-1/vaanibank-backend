@@ -18,7 +18,7 @@ import random
 from datetime import date, timedelta
 from typing import Optional
 
-# ── Realistic Indian name pools ───────────────────────────────────────────────
+# Realistic Indian name pools
 _FIRST_NAMES = [
     "Ramesh", "Suresh", "Mahesh", "Rajesh", "Dinesh",
     "Priya", "Sunita", "Kavita", "Anita", "Geeta",
@@ -205,9 +205,7 @@ def _account_open_date(seed: int) -> str:
     return open_date.strftime("%d %b %Y")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # MAIN CBS LOOKUP FUNCTION
-# ══════════════════════════════════════════════════════════════════════════════
 
 def lookup_by_account_number(account_number: str) -> Optional[dict]:
     """
@@ -266,7 +264,7 @@ def lookup_by_account_number(account_number: str) -> Optional[dict]:
     net_banking = rng.random() > 0.40
 
     return {
-        # ── Identity ──────────────────────────────────────────────────────────
+        # Identity
         "customer_id":         f"CIF{clean[:3]}{seed % 100000:05d}",
         "full_name":           full_name,
         "dob":                 dob_str,
@@ -282,7 +280,7 @@ def lookup_by_account_number(account_number: str) -> Optional[dict]:
         "state":               state,
         "pincode":             pincode,
 
-        # ── Account ───────────────────────────────────────────────────────────
+        # Account
         "account_number":      clean,
         "account_type":        account_type,
         "ifsc_code":           ifsc,
@@ -292,12 +290,12 @@ def lookup_by_account_number(account_number: str) -> Optional[dict]:
         "balance":             balance,
         "available_balance":   balance,
 
-        # ── KYC ───────────────────────────────────────────────────────────────
+        # KYC
         "kyc_status":          kyc_status,
         "kyc_expiry_date":     kyc_expiry,
         "kyc_mode":            rng.choice(["Aadhaar OTP", "Biometric", "In-Person Verification"]),
 
-        # ── Linked products ───────────────────────────────────────────────────
+        # Linked products
         "linked_accounts":     "1 " + account_type,
         "active_loans":        loan,
         "active_fds":          fd,
@@ -305,11 +303,11 @@ def lookup_by_account_number(account_number: str) -> Optional[dict]:
         "debit_card":          card_type,
         "net_banking":         "Active" if net_banking else "Not Registered",
 
-        # ── Nominee ───────────────────────────────────────────────────────────
+        # Nominee
         "nominee_name":        nominee_name,
         "nominee_relation":    nominee_relation,
 
-        # ── Risk & Compliance ─────────────────────────────────────────────────
+        # Risk & Compliance
         "risk_category":       rng.choice(["Low", "Low", "Low", "Medium", "High"]),
         "cibil_score":         rng.randint(550, 900) if occupation != "Farmer" else None,
         "pmjdy_account":       account_type == "Jan Dhan Account",
@@ -367,7 +365,7 @@ def lookup_customer(
     return None
 
 
-# ── Module-level singleton (stateless, so just functions — no class needed) ───
+# Module-level singleton (stateless, so just functions — no class needed)
 cbs_service = type("CBSService", (), {
     "lookup_customer": staticmethod(lookup_customer),
     "lookup_by_account_number": staticmethod(lookup_by_account_number),

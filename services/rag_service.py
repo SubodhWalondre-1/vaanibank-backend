@@ -41,9 +41,7 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("vaanibank.rag")
 
-# ---------------------------------------------------------------------------
 # Optional heavy dependencies — graceful degradation if not installed
-# ---------------------------------------------------------------------------
 
 try:
     import chromadb
@@ -77,9 +75,7 @@ except ImportError:
     _YAML_AVAILABLE = False
 
 
-# ---------------------------------------------------------------------------
 # Constants
-# ---------------------------------------------------------------------------
 
 # Path to the flat-file knowledge base relative to this file
 _KB_PATH = Path(__file__).resolve().parent.parent / "knowledge_base"
@@ -104,9 +100,7 @@ _MIN_SCORE_THRESHOLD = 0.10
 
 
 
-# ---------------------------------------------------------------------------
 # Data classes
-# ---------------------------------------------------------------------------
 
 @dataclass
 class RetrievedChunk:
@@ -126,9 +120,7 @@ class RetrievalResult:
     total_retrieved: int
 
 
-# ---------------------------------------------------------------------------
 # Chunking helpers
-# ---------------------------------------------------------------------------
 
 def _parse_yaml_frontmatter(text: str) -> tuple[dict, str]:
     """
@@ -141,7 +133,7 @@ def _parse_yaml_frontmatter(text: str) -> tuple[dict, str]:
         return {}, text
 
     try:
-        # Find closing --- delimiter
+        # Find closing  delimiter
         end_idx = text.index("---", 3)
         yaml_block = text[3:end_idx].strip()
         body = text[end_idx + 3:].strip()
@@ -211,9 +203,7 @@ def _chunk_by_doc_type(text: str, doc_type: str, source_file: str) -> List[str]:
     return chunks
 
 
-# ---------------------------------------------------------------------------
 # RAG Service
-# ---------------------------------------------------------------------------
 
 class RAGService:
     """
@@ -245,9 +235,7 @@ class RAGService:
         self._bm25_ids:  List[str] = []          # chunk_id for each BM25 document
         self._bm25_meta: List[Dict] = []         # metadata for each BM25 document
 
-    # ------------------------------------------------------------------
     # Public API
-    # ------------------------------------------------------------------
 
     async def ensure_ready(self) -> None:
         """
@@ -399,9 +387,7 @@ class RAGService:
         lines.append("\n[END OF BANKING KNOWLEDGE]")
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------
     # Synchronous internals (run in thread pool via asyncio.to_thread)
-    # ------------------------------------------------------------------
 
     def _get_embeddings_sync(self, texts: str | List[str], is_document: bool = False) -> List[float] | List[List[float]]:
         """
@@ -685,11 +671,11 @@ class RAGService:
                 retrieval_source="fallback", total_retrieved=0,
             )
 
-        # --- Step 1: Build ChromaDB metadata filter ----------------------------
+        # Step 1: Build ChromaDB metadata filter
         # where clause narrows the HNSW ANN search to relevant intent/product docs
         where_clause = self._build_where_clause(intent, product)
 
-        # --- Step 2: Dense vector retrieval ------------------------------------
+        # Step 2: Dense vector retrieval
         query_embedding = None
         try:
             query_embedding = self._get_embeddings_sync(query, is_document=False)
@@ -724,7 +710,7 @@ class RAGService:
             except Exception as exc:
                 logger.warning("Dense retrieval failed: %s", exc)
 
-        # --- Step 3: BM25 keyword retrieval ------------------------------------
+        # Step 3: BM25 keyword retrieval
         bm25_results: Dict[str, float] = {}   # chunk_id → BM25 score
 
         if self._bm25_index is not None and self._bm25_docs:
@@ -754,7 +740,7 @@ class RAGService:
                     dense_meta[cid]  = meta
                 count += 1
 
-        # --- Step 4: Reciprocal Rank Fusion ------------------------------------
+        # Step 4: Reciprocal Rank Fusion
         # RRF score = sum(1 / (rank + k)) across both lists
         # Standard k=60 reduces sensitivity to very high-ranked outliers
         rrf_scores: Dict[str, float] = {}
@@ -782,7 +768,7 @@ class RAGService:
         for cid in candidates:
             final_scores[cid] = rrf_scores[cid]
 
-        # --- Step 6: Assemble final result -------------------------------------
+        # Step 6: Assemble final result
         ranked = sorted(final_scores, key=final_scores.get, reverse=True)
         retrieved_chunks: List[RetrievedChunk] = []
 
@@ -846,8 +832,6 @@ class RAGService:
         return where
 
 
-# ---------------------------------------------------------------------------
 # Module-level singleton — import this everywhere
-# ---------------------------------------------------------------------------
 
 rag_service = RAGService()

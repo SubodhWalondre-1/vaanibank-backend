@@ -36,14 +36,14 @@ from sqlalchemy.sql import func
 from database import Base
 
 
-# ── Utility ────────────────────────────────────────────────────────────────────
+# Utility
 
 def _now() -> datetime:
     """Timezone-aware UTC now — used as column server_default callable."""
     return datetime.now(timezone.utc)
 
 
-# ── Enums ──────────────────────────────────────────────────────────────────────
+# Enums
 
 class StaffRole(str, enum.Enum):
     teller = "teller"
@@ -101,7 +101,7 @@ class PIIType(str, enum.Enum):
     dob = "dob"
 
 
-# ── 1. Branch ──────────────────────────────────────────────────────────────────
+# 1. Branch
 
 class Branch(Base):
     __tablename__ = "branches"
@@ -120,7 +120,7 @@ class Branch(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Relationships ──
+    # Relationships
     staff_members: Mapped[List["StaffMember"]] = relationship(
         "StaffMember", back_populates="branch", lazy="select"
     )
@@ -135,7 +135,7 @@ class Branch(Base):
         return f"<Branch {self.branch_code} — {self.branch_name}>"
 
 
-# ── 2. StaffMember ─────────────────────────────────────────────────────────────
+# 2. StaffMember
 
 class StaffMember(Base):
     __tablename__ = "staff_members"
@@ -158,7 +158,7 @@ class StaffMember(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Relationships ──
+    # Relationships
     branch: Mapped["Branch"] = relationship("Branch", back_populates="staff_members")
     sessions: Mapped[List["Session"]] = relationship(
         "Session", back_populates="staff", lazy="select"
@@ -168,7 +168,7 @@ class StaffMember(Base):
         return f"<StaffMember {self.staff_id} — {self.full_name} ({self.role})>"
 
 
-# ── 3. Session ─────────────────────────────────────────────────────────────────
+# 3. Session
 
 class Session(Base):
     __tablename__ = "sessions"
@@ -208,7 +208,7 @@ class Session(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Customer PII — captured during session (popup input or voice) ──────────
+    # Customer PII — captured during session (popup input or voice)
     customer_account_number: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     customer_mobile_number: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
@@ -219,10 +219,10 @@ class Session(Base):
     customer_kyc_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     customer_balance: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
 
-    # ── AI Conversation Intelligence — accumulated collected_info from LLM ──
+    # AI Conversation Intelligence — accumulated collected_info from LLM
     collected_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=None)
 
-    # ── SaralForm — timestamp set when customer submits the signed form ────────
+    # SaralForm — timestamp set when customer submits the signed form
     #
     # NULL  → form not yet signed (all sessions before SaralForm feature, or
     #         sessions where customer did not reach the form step).
@@ -230,7 +230,7 @@ class Session(Base):
     #
     # This column requires an Alembic migration before it can be used:
     #   cd backend
-    #   alembic revision --autogenerate -m "add_form_signed_at_to_sessions"
+    # alembic revision autogenerate m "add_form_signed_at_to_sessions"
     #   alembic upgrade head
     #
     # The migration will generate:
@@ -243,7 +243,7 @@ class Session(Base):
         comment="UTC timestamp when customer submitted the signed SaralForm",
     )
 
-    # ── Relationships ──
+    # Relationships
     branch: Mapped["Branch"] = relationship("Branch", back_populates="sessions")
     staff: Mapped[Optional["StaffMember"]] = relationship("StaffMember", back_populates="sessions")
     exchanges: Mapped[List["Exchange"]] = relationship(
@@ -263,7 +263,7 @@ class Session(Base):
         return f"<Session {self.token_number} — {self.status}>"
 
 
-# ── 4. Exchange ────────────────────────────────────────────────────────────────
+# 4. Exchange
 
 class Exchange(Base):
     __tablename__ = "exchanges"
@@ -293,12 +293,12 @@ class Exchange(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Performance indexes ──
+    # Performance indexes
     __table_args__ = (
         Index('ix_exchange_session_number', 'session_id', 'exchange_number'),
     )
 
-    # ── Relationships ──
+    # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="exchanges")
     pii_logs: Mapped[List["PIILog"]] = relationship(
         "PIILog", back_populates="exchange", cascade="all, delete-orphan", lazy="select"
@@ -308,7 +308,7 @@ class Exchange(Base):
         return f"<Exchange #{self.exchange_number} session={self.session_id} dir={self.direction}>"
 
 
-# ── 5. ProcessStep ─────────────────────────────────────────────────────────────
+# 5. ProcessStep
 
 class ProcessStep(Base):
     __tablename__ = "process_steps"
@@ -333,7 +333,7 @@ class ProcessStep(Base):
         UniqueConstraint("intent_type", "step_number", name="uq_intent_step"),
     )
 
-    # ── Relationships ──
+    # Relationships
     tracking_entries: Mapped[List["SessionProcessTracking"]] = relationship(
         "SessionProcessTracking", back_populates="step", lazy="select"
     )
@@ -342,7 +342,7 @@ class ProcessStep(Base):
         return f"<ProcessStep {self.intent_type}[{self.step_number}]>"
 
 
-# ── 6. SessionProcessTracking ──────────────────────────────────────────────────
+# 6. SessionProcessTracking
 
 class SessionProcessTracking(Base):
     __tablename__ = "session_process_tracking"
@@ -359,12 +359,12 @@ class SessionProcessTracking(Base):
     )
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # ── Performance indexes ──
+    # Performance indexes
     __table_args__ = (
         Index('ix_tracking_session_status', 'session_id', 'status'),
     )
 
-    # ── Relationships ──
+    # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="process_tracking")
     step: Mapped["ProcessStep"] = relationship("ProcessStep", back_populates="tracking_entries")
 
@@ -372,7 +372,7 @@ class SessionProcessTracking(Base):
         return f"<SessionProcessTracking session={self.session_id} step={self.step_id} {self.status}>"
 
 
-# ── 7. BilingualSummary ────────────────────────────────────────────────────────
+# 7. BilingualSummary
 
 class BilingualSummary(Base):
     __tablename__ = "bilingual_summaries"
@@ -400,14 +400,14 @@ class BilingualSummary(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Relationships ──
+    # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="bilingual_summary")
 
     def __repr__(self) -> str:
         return f"<BilingualSummary session={self.session_id} pdf={self.pdf_generated}>"
 
 
-# ── 8. PIILog ──────────────────────────────────────────────────────────────────
+# 8. PIILog
 
 class PIILog(Base):
     __tablename__ = "pii_logs"
@@ -425,7 +425,7 @@ class PIILog(Base):
         DateTime(timezone=True), nullable=False, default=_now
     )
 
-    # ── Relationships ──
+    # Relationships
     session: Mapped["Session"] = relationship("Session", back_populates="pii_logs")
     exchange: Mapped[Optional["Exchange"]] = relationship("Exchange", back_populates="pii_logs")
 
@@ -433,7 +433,7 @@ class PIILog(Base):
         return f"<PIILog {self.pii_type} session={self.session_id}>"
 
 
-# ── 9. AuditLog ───────────────────────────────────────────────────────────────
+# 9. AuditLog
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -473,7 +473,7 @@ class AuditLog(Base):
         return f"<AuditLog {self.action} actor={self.actor_staff_id} target={self.target_staff_id}>"
 
 
-# ── 10. AnalyticsDaily ─────────────────────────────────────────────────────────
+# 10. AnalyticsDaily
 
 class AnalyticsDaily(Base):
     __tablename__ = "analytics_daily"
@@ -506,7 +506,7 @@ class AnalyticsDaily(Base):
         UniqueConstraint("branch_id", "date", name="uq_branch_date"),
     )
 
-    # ── Relationships ──
+    # Relationships
     branch: Mapped["Branch"] = relationship("Branch", back_populates="analytics")
 
     def __repr__(self) -> str:

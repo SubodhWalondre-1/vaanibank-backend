@@ -24,11 +24,9 @@ from websocket.manager import ws_manager
 logger = logging.getLogger("vaanibank.pipeline_helpers")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # LANGUAGE MAPPINGS
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Language maps — imported from canonical source (core.language) ─────────────
+# Language maps — imported from canonical source (core.language)
 from core.language import (
     LANG_CODE_TO_NAME as _LANG_NAMES,
     LANG_CODE_TO_ATTR as _LANG_ATTR_MAP,
@@ -37,9 +35,7 @@ from core.language import (
 )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PROCESS STEP INITIALIZATION
-# ══════════════════════════════════════════════════════════════════════════════
 
 async def initialize_process_steps(
     session_id: int,
@@ -104,9 +100,7 @@ async def initialize_process_steps(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SMART INPUT TRIGGER — keyword detection → customer input popup
-# ══════════════════════════════════════════════════════════════════════════════
 
 # Maps keywords (lower-case) → (field_type, staff_label, customer_label)
 INPUT_KEYWORD_MAP = [

@@ -18,7 +18,7 @@ from __future__ import annotations
 from alembic import op
 import sqlalchemy as sa
 
-# ── Revision identifiers ──────────────────────────────────────────────────────
+# Revision identifiers
 # Full linear chain after merge:
 #   001 → e4ef62d0f1cb → [003 → 004, 002] → merge_002_004 → 005_add_form_signed_at
 revision: str = "005_add_form_signed_at"

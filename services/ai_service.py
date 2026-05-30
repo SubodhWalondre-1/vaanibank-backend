@@ -47,11 +47,9 @@ from services.storage_service import storage_service
 
 logger = logging.getLogger("vaanibank.ai")
 
-# ══════════════════════════════════════════════════════════════════════════════
 # CONSTANTS
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Language maps — imported from canonical source (core.language) ─────────────
+# Language maps — imported from canonical source (core.language)
 from core.language import (
     LANG_CODE_TO_NAME as _LANG_DISPLAY,
     SARVAM_LANG_MAP as _SARVAM_LANG_MAP,
@@ -64,19 +62,12 @@ _TTS_CACHE_TTL = 7 * 24 * 3600   # 7 days in seconds
 _HTTP_TIMEOUT = 30.0              # seconds
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # RESULT DATACLASSES
-# ══════════════════════════════════════════════════════════════════════════════
 
-@dataclass
-class TranscriptionResult:
-    text: str
-    confidence: float
-    model_used: str
-    language_detected: str
-    pii_detected: bool = False
-    pii_types: List[str] = field(default_factory=list)
-    masked_text: str = ""
+# TranscriptionResult is now defined in stt_service.py (Single Responsibility).
+# Re-export here for backward compatibility with existing callers.
+from services.stt_service import TranscriptionResult  # noqa: E402
+from services.stt_service import stt_service as _stt_service  # noqa: E402
 
 
 @dataclass
@@ -91,12 +82,12 @@ class LLMProcessResult:
     banking_terms_detected: List[str]
     process_triggered: Optional[str]
     raw_response: str = ""
-    # ── Conversation Intelligence (P0 feature) ──
+    # Conversation Intelligence (P0 feature)
     collected_info: Dict[str, Any] = field(default_factory=dict)
     next_question_hindi: str = ""
     next_question_customer_lang: str = ""
     auto_step_completed: Optional[str] = None
-    # ── Conversation Stage (P2 — exploring vs ready_to_apply) ──
+    # Conversation Stage (P2 — exploring vs ready_to_apply)
     conversation_stage: str = "exploring"
 
 
@@ -115,9 +106,7 @@ class LanguageDetectionResult:
     confidence: float
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GROQ SYSTEM PROMPT BUILDER
-# ══════════════════════════════════════════════════════════════════════════════
 
 # Language code → fallback phrase in that language
 _WAIT_PHRASES: Dict[str, str] = {
@@ -367,9 +356,7 @@ Return ONLY valid JSON — no markdown, no explanation, no extra text:
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # AI SERVICE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class AIService:
     """
@@ -385,9 +372,7 @@ class AIService:
     """
 
     def __init__(self) -> None:
-        self._audio_path = Path(
-            os.getenv("AUDIO_STORAGE_PATH", "./storage/audio")
-        )
+        self._audio_path = Path(settings.AUDIO_STORAGE_PATH)
         self._audio_path.mkdir(parents=True, exist_ok=True)
 
         self._groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
@@ -400,7 +385,7 @@ class AIService:
         self._GROQ_FAILURE_THRESHOLD: int = 3     # open after N consecutive failures
         self._GROQ_COOLDOWN_SECONDS: float = 30.0 # fast-fail duration
 
-        # ── Gemini backup LLM ──
+        # Gemini backup LLM
         self._gemini_model = None
         self._gemini_failures: int = 0
         self._gemini_circuit_open_until: float = 0
@@ -427,7 +412,7 @@ class AIService:
             elif not settings.GEMINI_API_KEY:
                 logger.info("GEMINI_API_KEY not set — Gemini backup disabled")
 
-        # ── Shared HTTP client — connection-pooled, avoids TCP+TLS per-request ──
+        # Shared HTTP client — connection-pooled, avoids TCP+TLS per-request
         self._http_client = httpx.AsyncClient(
             timeout=_HTTP_TIMEOUT,
             limits=httpx.Limits(
@@ -436,7 +421,7 @@ class AIService:
             ),
         )
 
-    # ── Redis lazy accessor ────────────────────────────────────────────────────
+    # Redis lazy accessor
 
     async def _get_redis(self):
         """Return the shared Redis client from database module."""
@@ -477,9 +462,7 @@ class AIService:
                     raise fallback_exc
             raise exc
 
-    # ══════════════════════════════════════════════════════════════════════════
-    # 1. TRANSCRIBE  (STT fallback chain)
-    # ══════════════════════════════════════════════════════════════════════════
+    # 1. TRANSCRIBE  (delegated to STTService — see stt_service.py)
 
     async def transcribe(
         self,
@@ -489,401 +472,29 @@ class AIService:
         skip_pii: bool = False,
     ) -> TranscriptionResult:
         """
-        Transcribe audio using the three-step fallback chain.
+        Transcribe audio using the multi-engine fallback chain.
 
-        Steps:
-          0. Convert incoming audio (WebM/Opus/OGG/MP3) → 16 kHz mono WAV
-          1. Sarvam Saarika 2.5        (confidence >= 0.6 → accept)
-          2. Groq Whisper Large-v3-T   (uses existing GROQ_API_KEY)
-          3. Reverie RevUp BFSI        (banking-trained, all 10 Indian languages)
+        Delegates to STTService (services/stt_service.py) which handles:
+            - Input validation (size, format)
+            - WAV conversion (ffmpeg with availability check)
+            - 3-engine fallback chain with per-engine latency tracking
+            - PII detection and masking
 
-        Returns TranscriptionResult with PII detection applied.
+        This method is a backward-compatible thin wrapper. All new STT
+        features should be added to stt_service.py, not here.
+
+        Returns:
+            TranscriptionResult with text, confidence, PII info, and metrics.
         """
-        # ── Step 0: Convert to WAV ─────────────────────────────────────────────
-        audio_bytes = await self._ensure_wav(audio_bytes)
-
-        text: Optional[str] = None
-        confidence: float = 0.0
-        model_used: str = ""
-        language_detected: str = language_code
-
-        # ── Step 1: Sarvam Saarika 2.5 ────────────────────────────────────────
-        sarvam_ok = (
-            settings.SARVAM_API_KEY
-            and settings.SARVAM_API_KEY != "<your-sarvam-key>"
-            and settings.SARVAM_API_KEY.strip() != ""
+        return await _stt_service.transcribe(
+            audio_bytes=audio_bytes,
+            language_code=language_code,
+            session_id=session_id,
+            skip_pii=skip_pii,
         )
 
-        if sarvam_ok and language_code in _SARVAM_LANGUAGES:
-            try:
-                stt_text, stt_confidence, stt_model_used = await self._stt_sarvam(
-                    audio_bytes, language_code
-                )
-                if stt_text and (stt_confidence >= _STT_CONFIDENCE_THRESHOLD or stt_confidence == 0.0):
-                    text = stt_text
-                    confidence = stt_confidence if stt_confidence > 0.0 else 0.85
-                    model_used = stt_model_used
-                    language_detected = language_code
-                elif not stt_text:
-                    logger.info("Sarvam returned empty transcript — falling back")
-                    text = None
-                else:
-                    logger.info(
-                        "Sarvam confidence %.2f < %.2f — falling back",
-                        stt_confidence,
-                        _STT_CONFIDENCE_THRESHOLD,
-                    )
-                    text = None
-            except Exception as exc:
-                logger.warning("Sarvam STT failed: %s — falling back to Groq Whisper", exc)
-                text = None
-        else:
-            if not sarvam_ok:
-                logger.info("Sarvam API key not set — using Groq Whisper directly")
 
-        # ── Step 2: Groq Whisper Large-v3-Turbo ───────────────────────────────
-        if text is None:
-            try:
-                text, confidence, model_used = await self._stt_groq_whisper(
-                    audio_bytes, language_code
-                )
-                language_detected = language_code
-                logger.info(
-                    "Groq Whisper success | model=%s | conf=%.2f", model_used, confidence
-                )
-            except Exception as exc:
-                logger.warning("Groq Whisper failed: %s — falling back to Reverie", exc)
-                text = None
-
-        # ── Step 3: Reverie RevUp BFSI ────────────────────────────────────────
-        if text is None:
-            reverie_ok = (
-                settings.REVERIE_APP_ID
-                and settings.REVERIE_API_KEY
-                and settings.REVERIE_APP_ID.strip() != ""
-                and settings.REVERIE_APP_ID != "your_reverie_app_id_here"
-            )
-            if reverie_ok:
-                try:
-                    text, confidence, model_used = await self._stt_reverie(
-                        audio_bytes, language_code
-                    )
-                    language_detected = language_code
-                    logger.info(
-                        "Reverie STT success | lang=%s | conf=%.2f", language_code, confidence
-                    )
-                except Exception as exc:
-                    logger.error("Reverie STT failed: %s", exc)
-                    text = None
-            else:
-                logger.warning(
-                    "Reverie credentials not configured — all STT fallbacks exhausted"
-                )
-
-        # ── Graceful degradation ───────────────────────────────────────────────
-        if not text:
-            logger.warning(
-                "All STT models failed for session=%s — returning placeholder",
-                session_id,
-            )
-            return TranscriptionResult(
-                text="[Voice message received — transcription unavailable]",
-                confidence=0.0,
-                model_used=model_used or "none",
-                language_detected=language_code,
-                pii_detected=False,
-                pii_types=[],
-                masked_text="[Voice message received — transcription unavailable]",
-            )
-
-        # ── PII detection on raw transcript (skipped for streaming partials) ──
-        if skip_pii:
-            return TranscriptionResult(
-                text=text,
-                confidence=confidence,
-                model_used=model_used,
-                language_detected=language_detected,
-                pii_detected=False,
-                pii_types=[],
-                masked_text=text,
-            )
-
-        pii_result = pii_service.detect_and_mask(text)
-
-        logger.info(
-            "STT success | session=%s | model=%s | confidence=%.2f | pii=%s",
-            session_id,
-            model_used,
-            confidence,
-            pii_result.pii_types,
-        )
-
-        return TranscriptionResult(
-            text=text,
-            confidence=confidence,
-            model_used=model_used,
-            language_detected=language_detected,
-            pii_detected=pii_result.pii_found,
-            pii_types=pii_result.pii_types,
-            masked_text=pii_result.masked_text if pii_result.pii_found else text,
-        )
-
-    # ── Audio format conversion ────────────────────────────────────────────────
-
-    async def _ensure_wav(self, audio_bytes: bytes) -> bytes:
-        """
-        Convert incoming audio (WebM/Opus/OGG/MP3 etc.) to 16 kHz mono WAV
-        using async ffmpeg subprocess. If already WAV, return as-is.
-        """
-        import aiofiles
-
-        header = audio_bytes[:12]
-
-        if header[:4] == b"RIFF":
-            return audio_bytes
-        elif header[:4] == b"OggS":
-            src_ext = ".ogg"
-            input_fmt = "ogg"
-        elif header[:4] == b"\x1aE\xdf\xa3":
-            src_ext = ".webm"
-            input_fmt = "webm"
-        elif b"webm" in header[4:12]:
-            src_ext = ".webm"
-            input_fmt = "webm"
-        else:
-            src_ext = ".webm"
-            input_fmt = "webm"
-
-        logger.debug(
-            "Audio format detected: ext=%s fmt=%s | header=%s",
-            src_ext, input_fmt, header[:8].hex(),
-        )
-
-        # Use temp files for input (ffmpeg needs seekable input for some formats)
-        import tempfile
-        tmp_fd, src_path = await asyncio.to_thread(tempfile.mkstemp, suffix=src_ext)
-        await asyncio.to_thread(os.close, tmp_fd)
-
-        async with aiofiles.open(src_path, "wb") as src:
-            await src.write(audio_bytes)
-
-        dst_path = src_path.rsplit(".", 1)[0] + ".wav"
-
-        try:
-            cmd = [
-                "ffmpeg", "-y",
-                "-f", input_fmt,
-                "-i", src_path,
-                "-ar", "16000",
-                "-ac", "1",
-                "-sample_fmt", "s16",
-                "-avoid_negative_ts", "make_zero",
-                "-strict", "-2",
-                "-f", "wav",
-                dst_path,
-            ]
-            # Use native async subprocess — no thread pool slot consumed
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
-
-            if proc.returncode != 0:
-                stderr_msg = stderr.decode(errors="replace")[:500]
-                logger.error(
-                    "ffmpeg conversion failed (rc=%d) | stderr: %s",
-                    proc.returncode,
-                    stderr_msg,
-                )
-                return audio_bytes
-
-            # Read output file asynchronously
-            async with aiofiles.open(dst_path, "rb") as f:
-                wav_bytes = await f.read()
-
-            logger.info(
-                "Audio converted to WAV | src=%d bytes (%s) → dst=%d bytes",
-                len(audio_bytes),
-                src_ext,
-                len(wav_bytes),
-            )
-            return wav_bytes
-
-        except asyncio.TimeoutError:
-            logger.error("ffmpeg conversion timed out (15s)")
-            return audio_bytes
-        except Exception as exc:
-            logger.error("Audio conversion exception, using original: %s", exc)
-            return audio_bytes
-
-        finally:
-            try:
-                await asyncio.to_thread(os.unlink, src_path)
-            except OSError:
-                pass
-            try:
-                await asyncio.to_thread(os.unlink, dst_path)
-            except OSError:
-                pass
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # STT HELPERS
-    # ══════════════════════════════════════════════════════════════════════════
-
-    async def _stt_sarvam(
-        self, audio_bytes: bytes, language_code: str
-    ) -> tuple[str, float, str]:
-        """Call Sarvam Saarika 2.5 STT API — primary engine."""
-        short_code = language_code.split("-")[0].lower()
-        bcp47 = _SARVAM_LANG_MAP.get(short_code, "hi-IN")
-
-        is_webm = (
-            audio_bytes[:4] == b'\x1aE\xdf\xa3'
-            or audio_bytes[4:8] == b'webm'
-        )
-        mime = "audio/webm" if is_webm else "audio/wav"
-        fname = "audio.webm" if is_webm else "audio.wav"
-
-        logger.debug("Sarvam STT upload: %s (%s) | %d bytes", fname, mime, len(audio_bytes))
-
-        response = await self._http_client.post(
-            settings.SARVAM_STT_URL,
-            headers={"api-subscription-key": settings.SARVAM_API_KEY},
-            files={"file": (fname, audio_bytes, mime)},
-            data={"language_code": bcp47, "with_timestamps": "false"},
-        )
-        if response.status_code >= 400:
-            logger.error(
-                "Sarvam STT error %d: %s",
-                response.status_code,
-                response.text[:300],
-            )
-        response.raise_for_status()
-        data = response.json()
-
-        transcript = (data.get("transcript") or data.get("text", "")).strip()
-        confidence = float(data.get("confidence", 0.85))
-
-        if not transcript:
-            logger.info("Sarvam returned empty transcript — will try fallback")
-            return "", 0.0, "sarvam_saarika_2.5"
-
-        return transcript, confidence, "sarvam_saarika_2.5"
-
-    async def _stt_groq_whisper(
-        self, audio_bytes: bytes, language_code: str
-    ) -> tuple[str, float, str]:
-        """
-        Groq Whisper Large-v3-Turbo — Fallback 1.
-        Free, extremely fast (Groq LPU), uses existing GROQ_API_KEY.
-        Supports all 10 Indian languages via Whisper multilingual model.
-        """
-        import aiofiles
-        tmp_fd, tmp_path = await asyncio.to_thread(tempfile.mkstemp, suffix=".wav")
-        await asyncio.to_thread(os.close, tmp_fd)
-
-        try:
-            async with aiofiles.open(tmp_path, "wb") as tmp:
-                await tmp.write(audio_bytes)
-
-            transcription = await asyncio.to_thread(
-                self._groq_whisper_sync,
-                tmp_path,
-                language_code,
-            )
-            text = transcription.strip()
-            if not text:
-                raise STTError(message="Groq Whisper returned empty transcript.")
-            return text, 0.90, "whisper-large-v3-turbo-groq"
-        finally:
-            try:
-                await asyncio.to_thread(os.unlink, tmp_path)
-            except OSError:
-                pass
-
-    def _groq_whisper_sync(self, audio_path: str, language_code: str) -> str:
-        """Synchronous Groq Whisper call wrapped in asyncio.to_thread.
-        Reuses a single sync Groq client to avoid TCP connection churn."""
-        if self._groq_sync_client is None:
-            from groq import Groq
-            self._groq_sync_client = Groq(api_key=settings.GROQ_API_KEY)
-
-        short_code = language_code.split("-")[0].lower()
-        with open(audio_path, "rb") as audio_file:
-            transcription = self._groq_sync_client.audio.transcriptions.create(
-                file=("audio.wav", audio_file),
-                model="whisper-large-v3-turbo",
-                # Odia: Whisper uses "ori" not "or"
-                language=short_code if short_code != "or" else "ori",
-                response_format="text",
-            )
-        return str(transcription).strip()
-
-    async def _stt_reverie(
-        self, audio_bytes: bytes, language_code: str
-    ) -> tuple[str, float, str]:
-        """
-        Reverie RevUp STT — Fallback 2.
-
-        BFSI-domain trained model — purpose-built for banking environments.
-        Covers all 10 Indian languages including Odia and Punjabi.
-        Free tier: 10 hours on signup at revup.reverieinc.com.
-        Docs: https://docs.reverieinc.com/speech-to-text-file-api/setup
-        """
-        app_id = settings.REVERIE_APP_ID
-        api_key = settings.REVERIE_API_KEY
-
-        if not app_id or not api_key:
-            raise STTError(message="Reverie credentials not configured.")
-
-        short_code = language_code.split("-")[0].lower()
-        src_lang = _REVERIE_LANG_MAP.get(short_code, "hi")
-
-        response = await self._http_client.post(
-            "https://revapi.reverieinc.com/",
-            headers={
-                "REV-APP-ID":  app_id,
-                "REV-API-KEY": api_key,
-                "REV-APPNAME": "stt_file",
-                "src_lang":    src_lang,
-                "domain":      "bfsi",   # banking & financial services domain
-            },
-            files={
-                "audio_file": ("audio.wav", audio_bytes, "audio/wav"),
-            },
-        )
-        if response.status_code >= 400:
-            logger.error(
-                "Reverie STT error %d: %s",
-                response.status_code,
-                response.text[:300],
-            )
-        response.raise_for_status()
-        data = response.json()
-
-        # Reverie returns both raw `text` and formatted `display_text`
-        # Prefer display_text (has punctuation + number formatting)
-        text = (
-            data.get("display_text")
-            or data.get("text")
-            or ""
-        ).strip()
-        confidence = float(data.get("confidence", 0.85))
-
-        if not text:
-            raise STTError(message="Reverie STT returned empty transcript.")
-
-        logger.info(
-            "Reverie STT success | lang=%s | conf=%.2f | text=%s",
-            src_lang, confidence, text[:60],
-        )
-        return text, confidence, "reverie-revup-bfsi"
-
-    # ══════════════════════════════════════════════════════════════════════════
     # 2. PROCESS WITH LLM
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def process_with_llm(
         self,
@@ -892,6 +503,7 @@ class AIService:
         conversation_history: Optional[List[Dict[str, str]]] = None,
         detected_intent: str = "",
         rag_context: str = "",
+        system_context: str = "",
     ) -> LLMProcessResult:
         """
         Send transcribed text to Groq llama-3.3-70b.
@@ -901,6 +513,8 @@ class AIService:
             source_language       : Display name e.g. "Marathi"
             conversation_history  : Prior turns as [{"role":..,"content":..}]
             detected_intent       : Known intent to inject guidance block
+            rag_context           : Context retrieved from vector store
+            system_context        : Dynamic system/dashboard context (missing docs, fields)
 
         Returns:
             LLMProcessResult with all parsed fields.
@@ -908,6 +522,8 @@ class AIService:
             LLMError on API failure.
         """
         system_prompt = _build_system_prompt(source_language, detected_intent=detected_intent)
+        if system_context:
+            system_prompt += f"\n\n=== CURRENT DASHBOARD & STATE CONTEXT ===\n{system_context}"
 
         messages: List[Dict[str, str]] = []
 
@@ -923,25 +539,12 @@ class AIService:
             messages.extend(conversation_history[-6:])
         messages.append({"role": "user", "content": text})
 
-        # P3 S-MED-1: Circuit breaker — fast-fail if Groq is degraded
-        groq_circuit_open = False
-        if self._groq_failures >= self._GROQ_FAILURE_THRESHOLD:
-            if time.time() < self._groq_circuit_open_until:
-                logger.warning(
-                    "Groq circuit OPEN — skipping to Gemini (resets in %.0fs)",
-                    self._groq_circuit_open_until - time.time(),
-                )
-                groq_circuit_open = True
-            else:
-                # Cooldown expired — allow a probe request
-                logger.info("Groq circuit half-open — allowing probe request")
-
-        # ── Try Groq first, fallback to Gemini ──────────────────────────────
-        raw = ""
-        llm_source = "groq"
-        groq_failed = groq_circuit_open  # skip Groq if circuit is open
-
-        if not groq_circuit_open:
+        # P3 S-MED-1: Circuit breaker wrappers
+        async def call_groq() -> str:
+            if self._groq_failures >= self._GROQ_FAILURE_THRESHOLD:
+                if time.time() < self._groq_circuit_open_until:
+                    logger.warning("Groq circuit OPEN — skipping")
+                    raise LLMError(message="Groq circuit OPEN", model=settings.GROQ_MODEL)
             try:
                 completion = await self._call_groq_with_fallback(
                     model=settings.GROQ_MODEL,
@@ -954,70 +557,89 @@ class AIService:
                     response_format={"type": "json_object"},
                     timeout=15.0,
                 )
-                # Success — reset circuit breaker
                 if self._groq_failures > 0:
                     logger.info("Groq circuit CLOSED — API recovered after %d failures", self._groq_failures)
                 self._groq_failures = 0
-                raw = completion.choices[0].message.content or ""
-            except Exception as groq_exc:
-                groq_failed = True
+                return completion.choices[0].message.content or ""
+            except Exception as e:
                 self._groq_failures += 1
                 if self._groq_failures >= self._GROQ_FAILURE_THRESHOLD:
                     self._groq_circuit_open_until = time.time() + self._GROQ_COOLDOWN_SECONDS
-                    logger.error(
-                        "Groq circuit OPENED — %d consecutive failures, cooldown %.0fs",
-                        self._groq_failures, self._GROQ_COOLDOWN_SECONDS,
-                    )
-                logger.warning("Groq LLM failed (%d/%d): %s — trying Gemini backup",
-                               self._groq_failures, self._GROQ_FAILURE_THRESHOLD, groq_exc)
+                raise e
 
-        # ── Gemini fallback ────────────────────────────────────────────────────
-        if groq_failed:
+        async def call_gemini() -> str:
             if self._gemini_model is None:
-                raise LLMError(
-                    message="Primary LLM (Groq) failed and Gemini backup is not configured.",
-                    model=settings.GROQ_MODEL,
-                )
-
-            # Gemini circuit breaker
+                raise LLMError(message="Gemini not configured", model="gemini")
             if self._gemini_failures >= self._GEMINI_FAILURE_THRESHOLD:
                 if time.time() < self._gemini_circuit_open_until:
-                    raise LLMError(
-                        message="Both LLMs unavailable (circuit breakers open).",
-                        model="groq+gemini",
-                    )
-                else:
-                    logger.info("Gemini circuit half-open — allowing probe request")
-
+                    logger.warning("Gemini circuit OPEN — skipping")
+                    raise LLMError(message="Gemini circuit OPEN", model=settings.GEMINI_MODEL)
             try:
-                # Build Gemini prompt (system + conversation as single prompt)
                 gemini_prompt = f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n"
                 for msg in messages:
                     role_label = "STAFF" if msg["role"] == "assistant" else "CUSTOMER"
                     gemini_prompt += f"{role_label}: {msg['content']}\n"
-
+                
                 gemini_response = await asyncio.to_thread(
                     self._gemini_model.generate_content, gemini_prompt
                 )
-                raw = gemini_response.text or ""
-                llm_source = "gemini"
-
-                # Success — reset Gemini circuit breaker
                 if self._gemini_failures > 0:
                     logger.info("Gemini circuit CLOSED — recovered after %d failures", self._gemini_failures)
                 self._gemini_failures = 0
-                logger.info("✅ Gemini backup LLM succeeded (Groq was down)")
-            except Exception as gemini_exc:
+                return gemini_response.text or ""
+            except Exception as e:
                 self._gemini_failures += 1
                 if self._gemini_failures >= self._GEMINI_FAILURE_THRESHOLD:
                     self._gemini_circuit_open_until = time.time() + self._GEMINI_COOLDOWN_SECONDS
-                logger.error("Gemini backup also failed: %s", gemini_exc, exc_info=True)
-                raise LLMError(
-                    message="Both Groq and Gemini LLMs failed. Please try again.",
-                    model="groq+gemini",
-                ) from gemini_exc
+                raise e
 
-        # ── Parse JSON (same logic for both Groq and Gemini) ──────────────────
+        # Fetch Dynamic Settings for LLM
+        from services.settings_service import settings_service
+        dyn_settings = await settings_service.get_all_settings()
+        primary_llm = dyn_settings.get("llm_model", "groq_llama_3.3_70b")
+
+        raw = ""
+        llm_source = "groq"
+
+        if primary_llm == "gemini_2.0_flash":
+            # Gemini is primary
+            try:
+                raw = await call_gemini()
+                llm_source = "gemini"
+                logger.info("✅ Primary LLM (Gemini) succeeded")
+            except Exception as gemini_exc:
+                logger.warning("Gemini primary failed: %s — trying Groq fallback", gemini_exc)
+                try:
+                    raw = await call_groq()
+                    llm_source = "groq"
+                    logger.info("✅ Groq fallback succeeded")
+                except Exception as groq_exc:
+                    logger.error("Both LLMs failed under Gemini-primary mode")
+                    raise LLMError(
+                        message="Both Gemini and Groq LLMs failed. Please try again.",
+                        model="gemini+groq",
+                    ) from groq_exc
+        else:
+            # Groq is primary
+            try:
+                raw = await call_groq()
+                llm_source = "groq"
+                logger.info("✅ Primary LLM (Groq) succeeded")
+            except Exception as groq_exc:
+                logger.warning("Groq primary failed: %s — trying Gemini fallback", groq_exc)
+                try:
+                    raw = await call_gemini()
+                    llm_source = "gemini"
+                    logger.info("✅ Gemini fallback succeeded")
+                except Exception as gemini_exc:
+                    logger.error("Both LLMs failed under Groq-primary mode")
+                    raise LLMError(
+                        message="Both Groq and Gemini LLMs failed. Please try again.",
+                        model="groq+gemini",
+                    ) from gemini_exc
+
+
+        # Parse JSON (same logic for both Groq and Gemini)
         try:
             clean = raw.strip()
             if clean.startswith("```"):
@@ -1058,7 +680,7 @@ class AIService:
             conversation_stage=parsed.get("conversation_stage", "exploring"),
         )
 
-        # ── Loop Prevention (Post-processing) ────────────────────────────────
+        # Loop Prevention (Post-processing)
         # If the LLM repeats the exact same suggestion from the last turn,
         # we should force it to at least try the next deterministic question.
         if conversation_history:
@@ -1152,9 +774,7 @@ class AIService:
                 "next_steps_customer": [],
             }
 
-    # ══════════════════════════════════════════════════════════════════════════
     # 3. GENERATE TTS
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def generate_tts(
         self,
@@ -1173,6 +793,23 @@ class AIService:
         Returns TTSResult.
         Raises TTSError if generation fails.
         """
+        if language_code:
+            language_code = language_code.split("-")[0].strip().lower()
+
+        # Fetch Dynamic Settings
+        from services.settings_service import settings_service
+        dyn_settings = await settings_service.get_all_settings()
+        tts_engine = dyn_settings.get("tts_engine", "sarvam_bulbul_v3")
+
+        if tts_engine == "none":
+            logger.info("TTS generation bypassed (tts_engine == 'none')")
+            return TTSResult(
+                audio_url="",
+                duration_seconds=0.0,
+                model_used="none",
+                from_cache=False,
+            )
+
         # P3 N-MED-3: SHA-256 replaces MD5 for lower collision probability
         cache_key = f"tts_cache:{hashlib.sha256((text + language_code).encode()).hexdigest()}"
 
@@ -1183,7 +820,7 @@ class AIService:
         except Exception as exc:
             logger.warning("Redis TTS connection failed: %s", exc)
 
-        # ── Redis cache check ──────────────────────────────────────────────────
+        # Redis cache check
         if redis is not None:
             try:
                 cached = await redis.get(cache_key)
@@ -1199,7 +836,7 @@ class AIService:
             except Exception as exc:
                 logger.warning("Redis TTS cache read failed: %s", exc)
 
-        # ── Sarvam Bulbul v3 ──────────────────────────────────────────────────
+        # Sarvam Bulbul v3
         audio_bytes: Optional[bytes] = None
         model_used = ""
 
@@ -1214,7 +851,7 @@ class AIService:
                 language_code=language_code,
             )
 
-        # ── Validate WAV header ────────────────────────────────────────────────
+        # Validate WAV header
         if len(audio_bytes) < 44 or audio_bytes[:4] != b'RIFF':
             logger.error(
                 "TTS returned invalid WAV! bytes=%d header_hex=%s",
@@ -1232,7 +869,7 @@ class AIService:
             audio_bytes = wav_header + audio_bytes
             logger.info("WAV header added manually | total=%d bytes", len(audio_bytes))
 
-        # ── Save audio file ────────────────────────────────────────────────────
+        # Save audio file
         timestamp = int(time.time() * 1000)
         filename = f"tts_{session_id or 0}_{language_code}_{timestamp}.wav"
         audio_url = await storage_service.upload_audio_bytes(audio_bytes, filename)
@@ -1240,7 +877,7 @@ class AIService:
         audio_data_bytes = max(0, len(audio_bytes) - 44)
         duration_seconds = round(audio_data_bytes / (22050 * 2), 2)
 
-        # ── Cache in Redis (reusing connection from above) ─────────────────────
+        # Cache in Redis (reusing connection from above)
         if redis is not None:
             try:
                 await redis.setex(
@@ -1267,7 +904,7 @@ class AIService:
             from_cache=False,
         )
 
-    # ── TTS helper ─────────────────────────────────────────────────────────────
+    # TTS helper
 
     async def _tts_sarvam(
         self, text: str, language_code: str
@@ -1304,9 +941,7 @@ class AIService:
         audio_bytes = base64.b64decode(audios[0])
         return audio_bytes, "sarvam_bulbul_v3"
 
-    # ══════════════════════════════════════════════════════════════════════════
     # 4. DETECT LANGUAGE
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def detect_language(
         self, audio_bytes: bytes
@@ -1344,9 +979,7 @@ class AIService:
             confidence=0.0,
         )
 
-    # ══════════════════════════════════════════════════════════════════════════
     # 5. TRANSLATE TEXT
-    # ══════════════════════════════════════════════════════════════════════════
 
     async def translate_text(
         self,
@@ -1371,8 +1004,14 @@ class AIService:
         target_bcp47 = _SARVAM_LANG_MAP.get(short_target, f"{short_target}-IN")
         source_bcp47 = _SARVAM_LANG_MAP.get(short_source, "hi-IN")
 
+        # Fetch Dynamic Settings
+        from services.settings_service import settings_service
+        dyn_settings = await settings_service.get_all_settings()
+        engine = dyn_settings.get("translation_engine", "sarvam_translate")
+
         sarvam_ok = (
-            settings.SARVAM_API_KEY
+            engine == "sarvam_translate"
+            and settings.SARVAM_API_KEY
             and settings.SARVAM_API_KEY.strip() not in ("", "<your-sarvam-key>")
         )
         if sarvam_ok:
@@ -1469,5 +1108,5 @@ class AIService:
             return text  # graceful fallback
 
 
-# ── Module-level singleton ────────────────────────────────────────────────────
+# Module-level singleton
 ai_service = AIService()

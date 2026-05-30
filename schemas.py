@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-# ── Shared base ────────────────────────────────────────────────────────────────
+# Shared base
 
 class _Base(BaseModel):
     model_config = ConfigDict(
@@ -34,9 +34,7 @@ class _Base(BaseModel):
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 1. AUTH
-# ══════════════════════════════════════════════════════════════════════════════
 
 class LoginRequest(_Base):
     staff_id: Optional[str] = Field(None, description="Staff ID e.g. UBI-NGP-001")
@@ -82,9 +80,7 @@ class LogoutResponse(_Base):
     message: str = "Logged out successfully"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 2. SESSION
-# ══════════════════════════════════════════════════════════════════════════════
 
 # SessionCreateRequest — name used by sessions.py router
 class SessionCreateRequest(_Base):
@@ -181,9 +177,7 @@ class SessionListResponse(_Base):
     total_pages: int = 1            # required by sessions.py router
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 3. EXCHANGE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class ExchangeCreate(_Base):
     session_id: int
@@ -229,9 +223,7 @@ class ExchangeResponse(_Base):
     created_at: datetime
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 4. STT
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TranscribeResponse(_Base):
     exchange_id: int                            # added — ai_pipeline.py returns this
@@ -258,9 +250,7 @@ class DetectLanguageResponse(_Base):
     confidence: float = Field(..., ge=0.0, le=1.0)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 5. LLM
-# ══════════════════════════════════════════════════════════════════════════════
 
 class LLMProcessRequest(_Base):
     text: str = Field(..., min_length=1)
@@ -302,9 +292,7 @@ class TranslateStaffResponse(_Base):
     target_language_code: str
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 6. TTS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class TTSGenerateRequest(_Base):
     text: str = Field(..., min_length=1, max_length=2000)
@@ -322,9 +310,7 @@ class TTSGenerateResponse(_Base):
     language_code: str
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 7. PROCESS STEPS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class ProcessStepResponse(_Base):
     id: int
@@ -399,9 +385,7 @@ class ProcessProgressResponse(_Base):
     is_complete: bool = False
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 8. SUMMARY
-# ══════════════════════════════════════════════════════════════════════════════
 
 class SummaryContent(_Base):
     title: Optional[str] = None
@@ -441,6 +425,7 @@ class WhatsAppSendRequest(_Base):
     phone_number: str = Field(..., min_length=10, max_length=15)
 
 
+
 # WhatsAppSendResponse — fields used by summary.py router: summary_id, queued, message
 class WhatsAppSendResponse(_Base):
     summary_id: int
@@ -450,9 +435,7 @@ class WhatsAppSendResponse(_Base):
     whatsapp_sent_at: Optional[datetime] = None
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 9. ANALYTICS
-# ══════════════════════════════════════════════════════════════════════════════
 
 # AnalyticsTodayResponse — imported by summary.py router
 class AnalyticsTodayResponse(_Base):
@@ -507,11 +490,9 @@ class StaffPerformanceResponse(_Base):
     languages_served: List[str] = Field(default_factory=list)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 10. WEBSOCKET EVENTS
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ── Server → Client payloads ───────────────────────────────────────────────────
+# Server → Client payloads
 
 class TranscriptionReadyPayload(_Base):
     text_original: str
@@ -574,7 +555,7 @@ class WSErrorPayload(_Base):
     detail: Optional[str] = None
 
 
-# ── Client → Server payloads ───────────────────────────────────────────────────
+# Client → Server payloads
 
 class StaffApprovedPayload(_Base):
     response_text: str = Field(..., min_length=1)
@@ -599,7 +580,7 @@ class EndSessionPayload(_Base):
     generate_summary: bool = True
 
 
-# ── Generic WS envelope ────────────────────────────────────────────────────────
+# Generic WS envelope
 
 class WSEvent(_Base):
     event: str = Field(
@@ -620,9 +601,7 @@ class WSPongPayload(_Base):
     timestamp: datetime
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # 11. Staff Speech / Translation (migrated from ai_pipeline.py — P3)
-# ══════════════════════════════════════════════════════════════════════════════
 
 class StaffTranscribeResponse(_Base):
     """Response for /stt/staff-transcribe — lightweight STT-only endpoint."""
@@ -642,7 +621,7 @@ class TranslateToEnglishResponse(_Base):
     english_text: str
 
 
-# ── Convenience union types ────────────────────────────────────────────────────
+# Convenience union types
 
 ServerPayload = (
     TranscriptionReadyPayload

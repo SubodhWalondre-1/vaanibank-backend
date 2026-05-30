@@ -29,13 +29,11 @@ branch_labels: str | None = None
 depends_on: str | None = None
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # UPGRADE
-# ══════════════════════════════════════════════════════════════════════════════
 
 def upgrade() -> None:
 
-    # ── 1. branches ───────────────────────────────────────────────────────────
+    # 1. branches
     op.create_table(
         "branches",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -57,7 +55,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_branches_branch_code", "branches", ["branch_code"], unique=True)
 
-    # ── 2. staff_members ──────────────────────────────────────────────────────
+    # 2. staff_members
     op.create_table(
         "staff_members",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -84,7 +82,7 @@ def upgrade() -> None:
     op.create_index("ix_staff_members_username", "staff_members", ["username"], unique=True)
     op.create_index("ix_staff_members_branch_id", "staff_members", ["branch_id"])
 
-    # ── 3. sessions ───────────────────────────────────────────────────────────
+    # 3. sessions
     op.create_table(
         "sessions",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -125,7 +123,7 @@ def upgrade() -> None:
     op.create_index("ix_sessions_status", "sessions", ["status"])
     op.create_index("ix_sessions_created_at", "sessions", ["created_at"])
 
-    # ── 4. exchanges ──────────────────────────────────────────────────────────
+    # 4. exchanges
     op.create_table(
         "exchanges",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -164,7 +162,7 @@ def upgrade() -> None:
         ["session_id", "exchange_number"],
     )
 
-    # ── 5. process_steps ──────────────────────────────────────────────────────
+    # 5. process_steps
     op.create_table(
         "process_steps",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -184,7 +182,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_process_steps_intent_type", "process_steps", ["intent_type"])
 
-    # ── 6. session_process_tracking ───────────────────────────────────────────
+    # 6. session_process_tracking
     op.create_table(
         "session_process_tracking",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -208,7 +206,7 @@ def upgrade() -> None:
     op.create_index("ix_tracking_session_id", "session_process_tracking", ["session_id"])
     op.create_index("ix_tracking_step_id", "session_process_tracking", ["step_id"])
 
-    # ── 7. bilingual_summaries ────────────────────────────────────────────────
+    # 7. bilingual_summaries
     op.create_table(
         "bilingual_summaries",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -242,7 +240,7 @@ def upgrade() -> None:
         "ix_bilingual_summaries_session_id", "bilingual_summaries", ["session_id"], unique=True
     )
 
-    # ── 8. pii_logs ───────────────────────────────────────────────────────────
+    # 8. pii_logs
     op.create_table(
         "pii_logs",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -267,7 +265,7 @@ def upgrade() -> None:
     op.create_index("ix_pii_logs_exchange_id", "pii_logs", ["exchange_id"])
     op.create_index("ix_pii_logs_pii_type", "pii_logs", ["pii_type"])
 
-    # ── 9. analytics_daily ────────────────────────────────────────────────────
+    # 9. analytics_daily
     op.create_table(
         "analytics_daily",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -312,9 +310,7 @@ def upgrade() -> None:
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # DOWNGRADE — drop in exact reverse FK order
-# ══════════════════════════════════════════════════════════════════════════════
 
 def downgrade() -> None:
     # 9 → 1 reverse order

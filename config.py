@@ -27,13 +27,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── Database ──────────────────────────────────────────
+    # Database
     DATABASE_URL: str = Field(
         default="postgresql://localhost:5432/vaanibank_db",
         description="PostgreSQL connection string",
     )
 
-    # ── Redis ─────────────────────────────────────────────
+    # Redis
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",
         description="Redis connection URL for caching and session state",
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
         description="Redis connection URL used as Celery task broker",
     )
 
-    # ── JWT ───────────────────────────────────────────────
+    # JWT
     JWT_SECRET_KEY: str = Field(
         default="vaanibank-super-secret-key-2026",
         description="HMAC secret for signing JWT tokens",
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
         description="Token expiry in hours (1–72)",
     )
 
-    # ── Sarvam AI ─────────────────────────────────────────
+    # Sarvam AI
     SARVAM_API_KEY: str = Field(
         default="",
         description="API key for Sarvam AI (STT + TTS)",
@@ -77,7 +77,7 @@ class Settings(BaseSettings):
         description="Sarvam TTS model identifier",
     )
 
-    # ── Reverie RevUp (STT fallback 2) ────────────────────
+    # Reverie RevUp (STT fallback 2)
     REVERIE_APP_ID: str = Field(
         default="",
         description="Reverie RevUp App ID (from revup.reverieinc.com dashboard)",
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
         description="Reverie RevUp API Key (from revup.reverieinc.com dashboard)",
     )
 
-    # ── Groq (LLM + STT fallback 1) ──────────────────────
+    # Groq (LLM + STT fallback 1)
     GROQ_API_KEY: str = Field(
         default="",
         description="API key for Groq inference",
@@ -103,7 +103,7 @@ class Settings(BaseSettings):
         description="Maximum tokens for LLM completion",
     )
 
-    # ── Google Gemini (LLM backup) ────────────────────────
+    # Google Gemini (LLM backup)
     GEMINI_API_KEY: str = Field(
         default="",
         description="Google Gemini API key (backup LLM)",
@@ -113,7 +113,7 @@ class Settings(BaseSettings):
         description="Gemini model identifier for backup LLM",
     )
 
-    # ── File Storage ──────────────────────────────────────
+    # File Storage
     AUDIO_STORAGE_PATH: str = Field(
         default="./storage/audio",
         description="Local directory for STT/TTS audio files",
@@ -137,7 +137,21 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = Field(default="", description="Cloudflare R2 Bucket Name")
     R2_PUBLIC_URL: str = Field(default="", description="Cloudflare R2 Public URL")
 
-    # ── App ───────────────────────────────────────────────
+    # Twilio Configuration
+    TWILIO_ACCOUNT_SID: str = Field(
+        default="",
+        description="Twilio Account SID",
+    )
+    TWILIO_AUTH_TOKEN: str = Field(
+        default="",
+        description="Twilio Auth Token",
+    )
+    TWILIO_WHATSAPP_FROM: str = Field(
+        default="whatsapp:+14155238886",
+        description="Twilio WhatsApp Sender Number (prefixed with whatsapp:)",
+    )
+
+    # App
     APP_ENV: str = Field(
         default="development",
         description="Runtime environment: development | staging | production",
@@ -153,7 +167,7 @@ class Settings(BaseSettings):
         description="Comma-separated list of CORS origins",
     )
 
-    # ── Derived helpers ───────────────────────────────────
+    # Derived helpers
     @field_validator("DATABASE_URL")
     @classmethod
     def clean_database_url(cls, v: str) -> str:
@@ -216,7 +230,7 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         return self.APP_ENV == "development"
 
-    # ── Redis key helpers ─────────────────────────────────
+    # Redis key helpers
     @staticmethod
     def redis_active_session_key(token_number: str) -> str:
         return f"active_session:{token_number}"
@@ -233,7 +247,7 @@ class Settings(BaseSettings):
     def redis_branch_config_key(branch_id: int) -> str:
         return f"branch_config:{branch_id}"
 
-    # ── Redis TTLs (seconds) ──────────────────────────────
+    # Redis TTLs (seconds)
     REDIS_SESSION_TTL: int = 7200         # 2 hours
     REDIS_TTS_CACHE_TTL: int = 604800     # 7 days
     REDIS_STAFF_ONLINE_TTL: int = 28800   # 8 hours

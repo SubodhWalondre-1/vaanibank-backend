@@ -31,9 +31,7 @@ from typing import List
 logger = logging.getLogger("vaanibank.pii")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # RESULT DATACLASS
-# ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass
 class PIIResult:
@@ -44,9 +42,7 @@ class PIIResult:
     pii_types: List[str] = field(default_factory=list)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # COMPILED REGEX PATTERNS
-# ══════════════════════════════════════════════════════════════════════════════
 
 # Aadhaar: 12-digit number issued to Indian residents
 # First digit 2-9, optional spaces every 4 digits
@@ -77,9 +73,7 @@ _DOB_RE = re.compile(
 )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # SERVICE CLASS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class PIIService:
     """
@@ -91,7 +85,7 @@ class PIIService:
         detect_and_mask(text) → PIIResult(masked_text, pii_found, pii_types)
     """
 
-    # ── Individual maskers ─────────────────────────────────────────────────────
+    # Individual maskers
 
     @staticmethod
     def _mask_aadhaar(text: str) -> tuple[str, int]:
@@ -144,7 +138,7 @@ class PIIService:
         result, count = _DOB_RE.subn("**/**/****", text)
         return result, count
 
-    # ── Public API ─────────────────────────────────────────────────────────────
+    # Public API
 
     def detect(self, text: str) -> List[str]:
         """
@@ -245,5 +239,5 @@ class PIIService:
         )
 
 
-# ── Module-level singleton ─────────────────────────────────────────────────────
+# Module-level singleton
 pii_service = PIIService()

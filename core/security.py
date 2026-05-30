@@ -37,7 +37,7 @@ from database import get_db
 
 logger = logging.getLogger("vaanibank.security")
 
-# ── Silence passlib / bcrypt version mismatch warning ─────────────────────────
+# Silence passlib / bcrypt version mismatch warning
 # passlib 1.7.4 reads bcrypt.__about__.__version__ — bcrypt 4.x removed __about__
 if not hasattr(_bcrypt_lib, "__about__"):
     _about = types.ModuleType("__about__")
@@ -45,7 +45,7 @@ if not hasattr(_bcrypt_lib, "__about__"):
     _bcrypt_lib.__about__ = _about  # type: ignore[attr-defined]
 
 
-# ── Password hashing ───────────────────────────────────────────────────────────
+# Password hashing
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -59,7 +59,7 @@ def verify_password(plain: str, hashed: str) -> bool:
     return _pwd_context.verify(plain, hashed)
 
 
-# ── JWT ────────────────────────────────────────────────────────────────────────
+# JWT
 _ALGORITHM = settings.JWT_ALGORITHM
 _SECRET = settings.JWT_SECRET_KEY
 _EXPIRE_HOURS = settings.JWT_EXPIRE_HOURS
@@ -134,7 +134,7 @@ def verify_access_token(token: str) -> dict:
     return payload
 
 
-# ── FastAPI Bearer scheme ──────────────────────────────────────────────────────
+# FastAPI Bearer scheme
 _bearer_scheme = HTTPBearer(auto_error=True)
 
 

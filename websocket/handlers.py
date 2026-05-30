@@ -93,12 +93,12 @@ class HandlersMixin:
             )
             return
 
-        # ── Streaming audio: session start ───────────────────────────────────
+        # Streaming audio: session start
         if event_type == "start_speaking":
             await self._handle_start_speaking(token_number, data)
             return
 
-        # ── Streaming audio: session end → trigger full pipeline ─────────────
+        # Streaming audio: session end → trigger full pipeline
         if event_type == "stop_speaking":
             await self._handle_stop_speaking(token_number, data)
             return
@@ -140,7 +140,7 @@ class HandlersMixin:
                 service_name,
             )
 
-            # ── Auto-greeting: when customer selects service and staff is present ──
+            # Auto-greeting: when customer selects service and staff is present
             # Sends a localized welcome message + TTS audio to the customer
             staff_ws = self.active_connections[token_number].get("staff")
             if staff_ws is not None:
@@ -198,7 +198,7 @@ class HandlersMixin:
             )
             return
 
-        # ── Immediate typing indicator → customer sees "Staff is responding..." ──
+        # Immediate typing indicator → customer sees "Staff is responding..."
         await self.send_to_customer(
             token_number,
             "staff_typing",
@@ -257,7 +257,7 @@ class HandlersMixin:
                 token_number, exc,
             )
 
-        # ── Fallback: LLM translate if customer_text is still same as source and lang != hi ──
+        # Fallback: LLM translate if customer_text is still same as source and lang != hi
         if short_lang and short_lang != "hi" and customer_text == response_text:
             try:
                 from services.ai_service import ai_service
@@ -276,7 +276,7 @@ class HandlersMixin:
                     "LLM translate fallback failed | token=%s | %s", token_number, exc
                 )
 
-        # ── Send text to customer panel immediately (shows before/regardless of TTS) ──
+        # Send text to customer panel immediately (shows before/regardless of TTS)
         await self.send_to_customer(
             token_number,
             "staff_message",
@@ -291,10 +291,10 @@ class HandlersMixin:
             token_number, real_lang_code,
         )
 
-        # ── Check staff speech for PII keywords → trigger customer input popup ────────────
+        # Check staff speech for PII keywords → trigger customer input popup
         await self._trigger_staff_input_if_needed(token_number, response_text)
 
-        # ── Generate TTS (in customer language) ────────────────────────────────
+        # Generate TTS (in customer language)
         try:
             from services.ai_service import ai_service
             tts_result = await ai_service.generate_tts(
@@ -317,7 +317,7 @@ class HandlersMixin:
             )
             return
 
-        # ── Persist to exchanges table ─────────────────────────────────────────
+        # Persist to exchanges table
         if exchange_id and session_id:
             try:
                 async with await self._get_db() as db:
@@ -338,7 +338,7 @@ class HandlersMixin:
                     "Exchange update failed | exchange_id=%s | %s", exchange_id, exc
                 )
 
-        # ── Update analytics (ai_suggestion_used / edited / ignored) ──────────
+        # Update analytics (ai_suggestion_used / edited / ignored)
         if session_id:
             await self._update_suggestion_analytics(
                 session_id=session_id,
@@ -346,7 +346,7 @@ class HandlersMixin:
                 use_suggestion=use_suggestion,
             )
 
-        # ── Send audio to customer (with translated text) ──────────────────────
+        # Send audio to customer (with translated text)
         await self.broadcast_audio(
             token_number=token_number,
             audio_url=tts_result.audio_url,
@@ -495,7 +495,7 @@ class HandlersMixin:
                     SessionProcessTracking,
                 )
 
-                # ── Lazy-insert: ensure SessionProcessTracking rows exist ──────
+                # Lazy-insert: ensure SessionProcessTracking rows exist
                 existing_count_result = await db.execute(
                     select(func.count(SessionProcessTracking.id)).where(
                         SessionProcessTracking.session_id == session_id
@@ -536,7 +536,7 @@ class HandlersMixin:
                             len(intent_steps), session_id, intent,
                         )
 
-                # ── Mark this step completed ───────────────────────────────────
+                # Mark this step completed
                 now = datetime.now(timezone.utc)
                 if tracking_id:
                     await db.execute(
@@ -554,7 +554,7 @@ class HandlersMixin:
                         .values(status="completed", completed_at=now)
                     )
 
-                # ── Count progress ─────────────────────────────────────────────
+                # Count progress
                 session_result = await db.execute(
                     select(Session).where(Session.id == session_id)
                 )
@@ -733,6 +733,10 @@ class HandlersMixin:
                 total_exchanges = session_obj.total_exchanges or 0
 
                 # Mark session completed
+                session_obj.status = "completed"
+                session_obj.ended_at = now
+                session_obj.duration_seconds = duration_seconds
+
                 await db.execute(
                     update(Session)
                     .where(Session.id == session_id)
@@ -755,17 +759,22 @@ class HandlersMixin:
 
                 await db.commit()
 
-            # ── Generate PDF if no summary yet ────────────────────────────────
-            if summary_url is None:
+                # Upsert analytics_daily row
                 try:
-                    summary_url = await self._generate_session_summary(
+                    from routers.sessions import _upsert_analytics_daily
+                    await _upsert_analytics_daily(db, session_obj, now)
+                except Exception as exc:
+                    logger.warning("Analytics upsert failed in WS handler (non-fatal): %s", exc)
+
+            # Generate PDF in background if no summary yet
+            if summary_url is None:
+                import asyncio
+                asyncio.create_task(
+                    self._generate_summary_task(
                         session_id=session_id,
                         token_number=token_number,
                     )
-                except Exception as exc:
-                    logger.warning(
-                        "PDF generation failed on end_session | %s", exc
-                    )
+                )
 
         except Exception as exc:
             logger.error(
@@ -776,15 +785,26 @@ class HandlersMixin:
             )
             return
 
-        # ── Clear Redis active_session key ────────────────────────────────────
+        # Clear Redis active_session key
         try:
             redis = await self._get_redis()
             await redis.delete(f"active_session:{token_number}")
         except Exception as exc:
             logger.warning("Redis cleanup failed on end_session: %s", exc)
 
-        # Auto-farewell: send thank-you + "any other assistance" message before ending
-        await self._send_auto_farewell(token_number, session_id)
+        # Auto-farewell: send thank-you + verification message before ending
+        # Returns TTS duration so we can wait for the customer to hear it
+        farewell_tts_duration = await self._send_auto_farewell(token_number, session_id)
+
+        # Wait for farewell TTS to finish playing on customer panel
+        # before broadcasting session_ended (which navigates away)
+        if farewell_tts_duration > 0:
+            wait_secs = min(farewell_tts_duration, 10.0) + 1.0  # cap at 11s
+            logger.info(
+                "Waiting %.1fs for farewell TTS to finish | token=%s",
+                wait_secs, token_number,
+            )
+            await asyncio.sleep(wait_secs)
 
         # Re-fetch session to get latest collected_data + language for SaralForm
         _final_collected_data: dict = {}
@@ -821,6 +841,43 @@ class HandlersMixin:
             duration_seconds,
             total_exchanges,
         )
+
+    async def _generate_summary_task(
+        self,
+        session_id: int,
+        token_number: str,
+    ) -> None:
+        """
+        Concurrently generate session summary LLM response and PDF,
+        then notify the staff panel via WebSocket.
+        """
+        try:
+            pdf_url = await self._generate_session_summary(
+                session_id=session_id,
+                token_number=token_number,
+            )
+            if pdf_url:
+                # Notify staff panel via WebSocket when PDF is generated successfully
+                await self.send_to_staff(
+                    token_number=token_number,
+                    event_type="pdf_ready",
+                    data={
+                        "session_id": session_id,
+                        "pdf_url": pdf_url,
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                logger.info(
+                    "Background summary task completed | session=%d | sent pdf_ready",
+                    session_id,
+                )
+        except Exception as exc:
+            logger.error(
+                "Background summary task failed | session=%d | %s",
+                session_id,
+                exc,
+                exc_info=True,
+            )
 
     async def _handle_trigger_input_request(
         self,
@@ -872,7 +929,7 @@ class HandlersMixin:
             )
             return
 
-        # ── Immediate typing indicator → customer sees "Staff is responding..." ──
+        # Immediate typing indicator → customer sees "Staff is responding..."
         await self.send_to_customer(
             token_number,
             "staff_typing",
@@ -929,7 +986,7 @@ class HandlersMixin:
             short_lang, VERIFICATION_SUBMITTED_MULTILINGUAL["en"]
         )
 
-        # ── Send text to customer panel immediately ──
+        # Send text to customer panel immediately
         await self.send_to_customer(
             token_number,
             "staff_message",
@@ -939,7 +996,7 @@ class HandlersMixin:
             },
         )
 
-        # ── Generate TTS (in customer language) ──
+        # Generate TTS (in customer language)
         try:
             from services.ai_service import ai_service
             tts_result = await ai_service.generate_tts(
@@ -966,7 +1023,7 @@ class HandlersMixin:
                 {"typing": False},
             )
 
-        # ── Broadcast updated navigator state to staff ──
+        # Broadcast updated navigator state to staff
         try:
             from services.session_navigator import compute_next_actions
             from services.document_service import compute_readiness
@@ -1016,7 +1073,7 @@ class HandlersMixin:
         pii_result = pii_service.detect_and_mask(raw_value)
         masked_value = pii_result.masked_text if pii_result.pii_found else "****" + raw_value[-4:] if len(raw_value) >= 4 else "****"
 
-        # ── Save raw value to Session table ────────────────────────────────────────
+        # Save raw value to Session table
         _PII_FIELD_MAP = {
             "account_number": "customer_account_number",
             "phone": "customer_mobile_number",
@@ -1043,7 +1100,7 @@ class HandlersMixin:
                     token_number, col, exc,
                 )
 
-        # ── Update collected_data → broadcast info_board_update ──
+        # Update collected_data → broadcast info_board_update
         _POPUP_TO_COLLECTED_INFO_KEY = {
             "phone": "phone_number_provided",
             "aadhaar": "aadhaar_provided",
@@ -1475,7 +1532,7 @@ class HandlersMixin:
                 token_number, exc,
             )
 
-        # ── Step 1: Send warm pre-form message to customer (like a greeting) ────────
+        # Step 1: Send warm pre-form message to customer (like a greeting)
         # Pick message in customer's language, fall back to Hindi
         short_lang = language_code.split("-")[0].lower() if language_code else "hi"
         PRE_FORM_MESSAGES = {
@@ -1590,7 +1647,7 @@ class HandlersMixin:
         import asyncio
         await asyncio.sleep(tts_sleep)
 
-        # ── Step 2: Now open the form on customer panel ────────────────────────
+        # Step 2: Now open the form on customer panel
         # nav_delay_ms tells the frontend exactly how long to stay on LiveSessionPage
         # after receiving saral_form_trigger, so the customer finishes reading/hearing
         # the Hindi greeting message before being navigated to /saral-form.

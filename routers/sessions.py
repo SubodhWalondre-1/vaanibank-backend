@@ -90,9 +90,7 @@ _DEMO_BRANCH_SEED = {
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _generate_token_number() -> str:
     """Generate a human-friendly token like MRT-2847."""
@@ -160,8 +158,25 @@ async def _upsert_analytics_daily(db: AsyncSession, session: Session, ended_at: 
     intent = session.intent_detected or "general"
     # Sentiment counter
     sentiment = session.sentiment_overall or "calm"
-    # Duration
-    dur = session.duration_seconds or 0
+    # Calculate exact average duration from sessions table directly to avoid rolling average corruption
+    # only completed sessions that ended on the same session_date (UTC) with duration <= 1800
+    from datetime import timedelta, time as _time
+    start_dt = datetime.combine(session_date, _time.min).replace(tzinfo=timezone.utc)
+    end_dt = start_dt + timedelta(days=1)
+
+    avg_dur_result = await db.execute(
+        select(func.coalesce(
+            func.avg(Session.duration_seconds),
+            0.0
+        )).where(
+            Session.branch_id == branch_id,
+            Session.status == "completed",
+            Session.duration_seconds <= 1800,
+            Session.ended_at >= start_dt,
+            Session.ended_at < end_dt
+        )
+    )
+    db_avg_dur = float(avg_dur_result.scalar() or 0.0)
 
     if row is None:
         # INSERT new row
@@ -171,7 +186,7 @@ async def _upsert_analytics_daily(db: AsyncSession, session: Session, ended_at: 
             total_sessions=1,
             completed_sessions=1 if is_completed else 0,
             abandoned_sessions=1 if is_abandoned else 0,
-            avg_duration_seconds=float(dur) if dur else None,
+            avg_duration_seconds=db_avg_dur if db_avg_dur > 0.0 else None,
             languages_used={lang: 1},
             intents_breakdown={intent: 1},
             sentiments_breakdown={sentiment: 1},
@@ -194,13 +209,7 @@ async def _upsert_analytics_daily(db: AsyncSession, session: Session, ended_at: 
         if has_pii:
             row.pii_detected_count += 1
 
-        # Recalculate rolling average duration
-        if dur and dur > 0:
-            existing_dur = row.avg_duration_seconds or 0
-            n = row.total_sessions  # already incremented
-            row.avg_duration_seconds = (
-                (existing_dur * (n - 1) + dur) / n
-            )
+        row.avg_duration_seconds = db_avg_dur if db_avg_dur > 0.0 else None
 
         # Merge JSONB counters
         langs = dict(row.languages_used or {})
@@ -350,9 +359,7 @@ async def _generate_summary_background(session_id: int, token_number: str) -> No
         logger.error("Background summary generation failed | session=%d | %s", session_id, exc)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /sessions/create
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/sessions/create",
@@ -460,9 +467,22 @@ async def create_session(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# Public Settings Endpoint
+
+@router.get(
+    "/sessions/settings/public",
+    status_code=200,
+    summary="Get public system settings (demo_mode) without authentication",
+)
+async def get_public_settings() -> dict:
+    from services.settings_service import settings_service
+    settings = await settings_service.get_all_settings()
+    return {
+        "demo_mode": settings.get("demo_mode", False),
+    }
+
+
 # POST /sessions/customer-create  (PUBLIC — no auth, for customer QR-scan)
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/sessions/customer-create",
@@ -596,9 +616,7 @@ async def customer_create_session(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /sessions/active
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/sessions/active",
@@ -659,9 +677,7 @@ async def get_active_sessions(
     return [_session_to_schema(s, branch) for s in sessions]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /sessions/history
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/sessions/history",
@@ -722,9 +738,7 @@ async def get_session_history(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /sessions/{token_number}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/sessions/{token_number}",
@@ -757,9 +771,7 @@ async def get_session(
     return _session_to_schema(session, branch)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PATCH /sessions/{session_id}/end
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.patch(
     "/sessions/{session_id}/end",
@@ -800,6 +812,10 @@ async def end_session(
         started = started.replace(tzinfo=timezone.utc)
     duration = int((now - started).total_seconds()) if started else None
 
+    session.status = SessionStatus.completed
+    session.ended_at = now
+    session.duration_seconds = duration
+
     await db.execute(
         update(Session)
         .where(Session.id == session_id)
@@ -813,7 +829,7 @@ async def end_session(
     except Exception as exc:
         logger.warning("Redis delete on end failed: %s", exc)
 
-    # ── Upsert analytics_daily row ────────────────────────────────────────────
+    # Upsert analytics_daily row
     try:
         await _upsert_analytics_daily(db, session, now)
     except Exception as exc:
@@ -859,9 +875,7 @@ async def end_session(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /sessions/{session_id}/collected-info
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/sessions/{session_id}/collected-info",
@@ -901,7 +915,7 @@ async def get_session_collected_info(
     total = len(collected)
     completion_pct = int((filled / max(total, 1)) * 100)
 
-    # ── DRV: Compute document readiness for restore ──────────────────────────
+    # DRV: Compute document readiness for restore
     doc_readiness = None
     if intent and intent.upper() not in ("GENERAL", ""):
         from services.document_service import compute_readiness
@@ -919,9 +933,7 @@ async def get_session_collected_info(
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # WS /ws/{token_number}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.websocket("/ws/{token_number}")
 async def websocket_endpoint(
@@ -940,10 +952,10 @@ async def websocket_endpoint(
     Staff connections require a valid JWT.
     Customer connections only need a valid token_number with an active/waiting session.
     """
-    # ── MUST accept() first — closing before accept causes 1006 on the client ──
+    # MUST accept() first — closing before accept causes 1006 on the client
     await websocket.accept()
 
-    # ── Validate session exists ────────────────────────────────────────────────
+    # Validate session exists
     from database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -956,12 +968,12 @@ async def websocket_endpoint(
         await websocket.close(code=4004, reason="Session not found")
         return
 
-    # ── Customer: session must be active or waiting ────────────────────────────
+    # Customer: session must be active or waiting
     if role == "customer" and session.status not in (SessionStatus.waiting, SessionStatus.active):
         await websocket.close(code=4003, reason="Session is no longer active")
         return
 
-    # ── Staff: must present a valid JWT ────────────────────────────────────────
+    # Staff: must present a valid JWT
     if role == "staff":
         if not token:
             await websocket.close(code=4001, reason="JWT required for staff")
@@ -972,7 +984,7 @@ async def websocket_endpoint(
             await websocket.close(code=4001, reason="Invalid or expired JWT")
             return
 
-    # ── Register connection with manager ───────────────────────────────────────
+    # Register connection with manager
     await ws_manager.connect(websocket, token_number, role)
 
     # Mark session active when staff connects + assign staff_id if unset
@@ -1022,13 +1034,9 @@ async def websocket_endpoint(
         await ws_manager.disconnect(websocket, token_number, role)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /sessions/{session_id}/customer-profile
-# ══════════════════════════════════════════════════════════════════════════════
 
-# ==============================================================================
 # GET /sessions/{session_id}/exchanges
-# ==============================================================================
 
 @router.get(
     "/sessions/{session_id}/exchanges",
@@ -1156,7 +1164,7 @@ async def get_customer_profile(
         or (pii_log.masked_value if pii_log else None)
     )
 
-    # ── CBS lookup — fetch full profile via account_number or aadhaar ────────
+    # CBS lookup — fetch full profile via account_number or aadhaar
     from services.cbs_service import lookup_customer
 
     cbs_profile = lookup_customer(
@@ -1165,7 +1173,7 @@ async def get_customer_profile(
         mobile=session_obj.customer_mobile_number,
     )
 
-    # ── Merge CBS data with Session DB fields ──────────────────────────────────
+    # Merge CBS data with Session DB fields
     # CBS data overrides Session-captured fields (more accurate)
     if cbs_profile:
         # Save CBS fields to Session DB as well (for future refreshes)
@@ -1198,7 +1206,7 @@ async def get_customer_profile(
         bool(account_number),
     )
 
-    # ── No CBS data — return what we have from session ──────────────────────────
+    # No CBS data — return what we have from session
     if not cbs_profile:
         return {
             "session_id":        session_id,
@@ -1224,9 +1232,9 @@ async def get_customer_profile(
             "active_fds":        None,
         }
 
-    # ── Full CBS profile return ─────────────────────────────────────────────────
+    # Full CBS profile return
     return {
-        # ── Session context ────────────────────────────────────────────────────
+        # Session context
         "session_id":        session_id,
         "token_number":      session_obj.token_number,
         "customer_language": session_obj.customer_language,
@@ -1238,7 +1246,7 @@ async def get_customer_profile(
         "cbs_linked":        True,
         "_lookup_method":    cbs_profile.get("_lookup_method", "account_number"),
 
-        # ── Identity (from CBS) ────────────────────────────────────────────────
+        # Identity (from CBS)
         "customer_id":       cbs_profile.get("customer_id"),
         "customer_name":     cbs_profile.get("full_name") or session_obj.customer_name,
         "full_name":         cbs_profile.get("full_name"),
@@ -1255,7 +1263,7 @@ async def get_customer_profile(
         "state":             cbs_profile.get("state"),
         "pincode":           cbs_profile.get("pincode"),
 
-        # ── Account details ────────────────────────────────────────────────────
+        # Account details
         "account_number":    cbs_profile.get("account_number") or account_number,
         "account_type":      cbs_profile.get("account_type") or session_obj.customer_account_type,
         "ifsc_code":         cbs_profile.get("ifsc_code"),
@@ -1264,12 +1272,12 @@ async def get_customer_profile(
         "balance":           cbs_profile.get("balance") or session_obj.customer_balance,
         "available_balance": cbs_profile.get("available_balance"),
 
-        # ── KYC ───────────────────────────────────────────────────────────────
+        # KYC
         "kyc_status":        cbs_profile.get("kyc_status") or session_obj.customer_kyc_status or "Unknown",
         "kyc_expiry_date":   cbs_profile.get("kyc_expiry_date"),
         "kyc_mode":          cbs_profile.get("kyc_mode"),
 
-        # ── Linked products ────────────────────────────────────────────────────
+        # Linked products
         "linked_accounts":   cbs_profile.get("linked_accounts"),
         "active_loans":      cbs_profile.get("active_loans"),
         "active_fds":        cbs_profile.get("active_fds"),
@@ -1277,11 +1285,11 @@ async def get_customer_profile(
         "debit_card":        cbs_profile.get("debit_card"),
         "net_banking":       cbs_profile.get("net_banking"),
 
-        # ── Nominee ───────────────────────────────────────────────────────────
+        # Nominee
         "nominee_name":      cbs_profile.get("nominee_name"),
         "nominee_relation":  cbs_profile.get("nominee_relation"),
 
-        # ── Risk & Compliance ─────────────────────────────────────────────────
+        # Risk & Compliance
         "risk_category":     cbs_profile.get("risk_category"),
         "cibil_score":       cbs_profile.get("cibil_score"),
         "pmjdy_account":     cbs_profile.get("pmjdy_account", False),

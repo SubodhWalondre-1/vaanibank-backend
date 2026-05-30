@@ -89,9 +89,7 @@ from config import settings
 
 logger = logging.getLogger("vaanibank.pdf")
 
-# ══════════════════════════════════════════════════════════════════════════════
 # BRAND PALETTE
-# ══════════════════════════════════════════════════════════════════════════════
 
 _BLUE        = colors.HexColor("#003087")   # UBI primary blue
 _BLUE_DARK   = colors.HexColor("#001a52")
@@ -121,16 +119,14 @@ _SENTIMENT_COLORS: Dict[str, str] = {
     "urgent":     "#534AB7",
 }
 
-# ── Page geometry ──────────────────────────────────────────────────────────────
+# Page geometry
 _PAGE_W, _PAGE_H = A4
 _MARGIN    = 16 * mm
 _USABLE_W  = _PAGE_W - 2 * _MARGIN
 _COL_ICON  = 7 * mm      # icon-circle column
 _COL_MAIN  = _USABLE_W - _COL_ICON - 4 * mm
 
-# ══════════════════════════════════════════════════════════════════════════════
 # FONT REGISTRATION (Noto Sans Devanagari + script fonts for Indian langs)
-# ══════════════════════════════════════════════════════════════════════════════
 
 _FONT_REGULAR = "Helvetica"
 _FONT_BOLD    = "Helvetica-Bold"
@@ -138,13 +134,52 @@ _FONT_HINDI   = "Helvetica"   # upgraded to NotoDevanagari when available
 _FONT_CUST    = "Helvetica"   # upgraded per customer language
 
 
+_FONT_URLS = {
+    "NotoSansDevanagari-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+    "NotoSansDevanagari-Bold.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Bold.ttf",
+    "NotoSansTamil-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansTamil/NotoSansTamil-Regular.ttf",
+    "NotoSansTelugu-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf",
+    "NotoSansKannada-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansKannada/NotoSansKannada-Regular.ttf",
+    "NotoSansBengali-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansBengali/NotoSansBengali-Regular.ttf",
+    "NotoSansGujarati-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
+    "NotoSansGurmukhi-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansGurmukhi/NotoSansGurmukhi-Regular.ttf",
+    "NotoSansOriya-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansOriya/NotoSansOriya-Regular.ttf",
+    "NotoSansMalayalam-Regular.ttf": "https://github.com/notofonts/noto-fonts/raw/main/hinted/ttf/NotoSansMalayalam/NotoSansMalayalam-Regular.ttf",
+}
+
+
+async def download_missing_fonts() -> None:
+    """Download missing Noto Sans TTF files for all 10 customer languages in the background."""
+    _this_dir = Path(__file__).resolve().parent
+    _backend_dir = _this_dir.parent
+    _fonts_dir = _backend_dir / "fonts"
+    _fonts_dir.mkdir(parents=True, exist_ok=True)
+
+    import httpx
+    async with httpx.AsyncClient(timeout=40.0, follow_redirects=True) as client:
+        for filename, url in _FONT_URLS.items():
+            dest = _fonts_dir / filename
+            if dest.is_file():
+                continue
+            logger.info("Downloading missing font %s from Google Fonts...", filename)
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                dest.write_bytes(resp.content)
+                logger.info("Successfully downloaded %s (%d bytes)", filename, len(resp.content))
+                global _FONTS_REGISTERED
+                _FONTS_REGISTERED = False
+            except Exception as e:
+                logger.error("Failed to download font %s: %s", filename, e)
+
+
 _FONTS_REGISTERED = False
 
-def _try_register_fonts() -> None:
+def _try_register_fonts(force: bool = False) -> None:
     """Register Noto fonts; silently fall back to Helvetica if not found."""
     global _FONT_REGULAR, _FONT_BOLD, _FONT_HINDI, _FONT_CUST, _FONTS_REGISTERED
 
-    if _FONTS_REGISTERED:
+    if _FONTS_REGISTERED and not force:
         return
 
     _this_dir    = Path(__file__).resolve().parent
@@ -203,6 +238,46 @@ def _try_register_fonts() -> None:
         except Exception:
             pass
 
+    # Bengali
+    bengali = _find("NotoSansBengali-Regular.ttf")
+    if bengali:
+        try:
+            pdfmetrics.registerFont(TTFont("NotoBengali", bengali))
+        except Exception:
+            pass
+
+    # Gujarati
+    gujarati = _find("NotoSansGujarati-Regular.ttf")
+    if gujarati:
+        try:
+            pdfmetrics.registerFont(TTFont("NotoGujarati", gujarati))
+        except Exception:
+            pass
+
+    # Gurmukhi (Punjabi)
+    gurmukhi = _find("NotoSansGurmukhi-Regular.ttf")
+    if gurmukhi:
+        try:
+            pdfmetrics.registerFont(TTFont("NotoGurmukhi", gurmukhi))
+        except Exception:
+            pass
+
+    # Oriya (Odia)
+    oriya = _find("NotoSansOriya-Regular.ttf")
+    if oriya:
+        try:
+            pdfmetrics.registerFont(TTFont("NotoOriya", oriya))
+        except Exception:
+            pass
+
+    # Malayalam
+    malayalam = _find("NotoSansMalayalam-Regular.ttf")
+    if malayalam:
+        try:
+            pdfmetrics.registerFont(TTFont("NotoMalayalam", malayalam))
+        except Exception:
+            pass
+
     logger.info(
         "[PDF-v2] Fonts — regular=%s | bold=%s | hindi=%s",
         _FONT_REGULAR, _FONT_BOLD, _FONT_HINDI,
@@ -217,11 +292,16 @@ def _font_for_language(language: str) -> str:
     """Return the best registered font for a customer language."""
     lang = language.lower()
     mapping = {
-        "tamil":    "NotoTamil",
-        "telugu":   "NotoTelugu",
-        "kannada":  "NotoKannada",
-        "marathi":  _FONT_HINDI,  # Devanagari script
-        "hindi":    _FONT_HINDI,
+        "tamil":      "NotoTamil",
+        "telugu":     "NotoTelugu",
+        "kannada":    "NotoKannada",
+        "bengali":    "NotoBengali",
+        "gujarati":   "NotoGujarati",
+        "punjabi":    "NotoGurmukhi",
+        "odia":       "NotoOriya",
+        "malayalam":  "NotoMalayalam",
+        "marathi":    _FONT_HINDI,  # Devanagari script
+        "hindi":      _FONT_HINDI,
     }
     for key, font in mapping.items():
         if key in lang:
@@ -233,9 +313,7 @@ def _font_for_language(language: str) -> str:
     return _FONT_REGULAR
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # PARAGRAPH STYLE FACTORY
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _make_styles(customer_font: str) -> Dict[str, ParagraphStyle]:
     def s(name: str, **kw) -> ParagraphStyle:
@@ -307,9 +385,7 @@ def _make_styles(customer_font: str) -> Dict[str, ParagraphStyle]:
     }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _as_list(value: Any) -> List[str]:
     """Safely coerce DB JSON field → list of non-empty strings."""
@@ -367,9 +443,182 @@ def _pii_label(pii_types: Optional[List[str]]) -> str:
     return ", ".join(parts) + " redacted per RBI Data Localisation Guidelines 2024"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+_HEADING_TRANSLATIONS = {
+    "key_points": {
+        "english": "Key Points",
+        "hindi": "मुख्य बिंदु",
+        "marathi": "मुख्य मुद्दे",
+        "tamil": "முக்கிய விவரங்கள்",
+        "telugu": "ముఖ్యమైన అంశాలు",
+        "bengali": "মূল বিষয়সমূহ",
+        "kannada": "ಪ್ರಮುಖ ಅಂಶಗಳು",
+        "odia": "ମୁଖ୍ୟ ବିନ୍ଦୁ",
+        "punjabi": "ਮੁੱਖ ਨੁਕਤੇ",
+        "gujarati": "મુખ્ય મુદ્દાઓ",
+        "malayalam": "പ്രധാന പോയിന്റുകൾ"
+    },
+    "summary": {
+        "english": "Session Summary",
+        "hindi": "सत्र सारांश",
+        "marathi": "सत्र सारांश",
+        "tamil": "அமர்வு சுருக்கம்",
+        "telugu": "సెషన్ సారాంశం",
+        "bengali": "সেশন সারাংশ",
+        "kannada": "ಅಧಿವೇಶನದ ಸಾರಾಂಶ",
+        "odia": "ଅଧିବେଶନ ସାରାଂଶ",
+        "punjabi": "ਸੈਸ਼ਨ ਸਾਰ",
+        "gujarati": "સત્ર સારાંશ",
+        "malayalam": "സെഷൻ സംഗ്രഹം"
+    },
+    "next_steps": {
+        "english": "Next Steps",
+        "hindi": "अगले कदम",
+        "marathi": "पुढील पावले",
+        "tamil": "அடுத்த படிகள்",
+        "telugu": "తదుపరి చర్యలు",
+        "bengali": "পরবর্তী পদক্ষেপ",
+        "kannada": "ಮುಂದಿನ ಹಂತಗಳು",
+        "odia": "ପରବର୍ତ୍ತୀ ପଦକ୍षେପ",
+        "punjabi": "ਅਗਲੇ ਕਦਮ",
+        "gujarati": "આગળના પગલાં",
+        "malayalam": "അടുത്ത ഘട്ടങ്ങൾ"
+    }
+}
+
+_FORM_NAME_TRANSLATIONS = {
+    "account_opening": {
+        "english": "Account Opening Form",
+        "hindi": "खाता खोलने का फॉर्म",
+        "marathi": "खाते उघडण्याचा फॉर्म",
+        "tamil": "கணக்கு திறப்பு படிவம்",
+        "telugu": "ఖాతా ప్రారంభ ఫారమ్",
+        "bengali": "অ্যাকাউন্ট খোলার ফর্ম",
+        "kannada": "ಖಾತೆ ತೆರೆಯುವ ಫಾರ್ಮ್",
+        "odia": "ଆକାଉଣ୍ଟ ଖୋଲିବା ଫର୍ମ",
+        "punjabi": "ਖਾਤਾ ਖੋਲ੍ਹਣ ਵਾਲਾ ਫਾਰਮ",
+        "gujarati": "ખાતું ખોલવાનું ફોર્મ",
+        "malayalam": "അക്കൗണ്ട് തുറക്കൽ ഫോം"
+    },
+    "loan_enquiry": {
+        "english": "Loan Application Form",
+        "hindi": "ऋण आवेदन फॉर्म",
+        "marathi": "कर्ज अर्ज फॉर्म",
+        "tamil": "கடன் விண்ணப்பப் படிவம்",
+        "telugu": "రుణ దరఖాస్తు ఫారమ్",
+        "bengali": "ঋণ আবেদন ফর্ম",
+        "kannada": "ಸಾಲದ ಅರ್ಜಿ ಫಾರ್ಮ್",
+        "odia": "ଋଣ ଆବେଦନ ଫର୍ମ",
+        "punjabi": "ਕਰਜ਼ਾ ਅਰਜ਼ੀ ਫਾਰਮ",
+        "gujarati": "લોન અરજી ફોર્મ",
+        "malayalam": "ലോൺ അപേക്ഷാ ഫോം"
+    },
+    "kyc_update": {
+        "english": "KYC Update Form",
+        "hindi": "केवाईसी अपडेट फॉर्म",
+        "marathi": "केवायसी अपडेट फॉर्म",
+        "tamil": "KYC புதுப்பிப்பு படிவம்",
+        "telugu": "KYC నవీకరణ ఫారమ్",
+        "bengali": "KYC আপডেট ফর্ম",
+        "kannada": "KYC నವೀಕರಣ ಫಾರ್ಮ್",
+        "odia": "KYC ଅପଡେଟ୍ ଫର୍ମ",
+        "punjabi": "KYC ਅੱਪਡੇਟ ਫਾਰਮ",
+        "gujarati": "KYC અપડેટ ફોર્મ",
+        "malayalam": "KYC അപ്‌ഡേറ്റ് ഫോം"
+    },
+    "card_services": {
+        "english": "Card Service Form",
+        "hindi": "कार्ड सेवा फॉर्म",
+        "marathi": "कार्ड सेवा फॉर्म",
+        "tamil": "அட்டை சேவை படிவம்",
+        "telugu": "కార్డ్ సేవా ఫారమ్",
+        "bengali": "কার্ড পরিষেবা ফর্ম",
+        "kannada": "ಕಾರ್ಡ್ ಸೇವಾ ಫಾರ್ಮ್",
+        "odia": "କାର୍ଡ ସେବା ଫର୍ମ",
+        "punjabi": "ਕਾਰਡ ਸੇਵਾ ਫਾਰਮ",
+        "gujarati": "કાર્ડ સેવા ફોર્મ",
+        "malayalam": "കാർഡ് സേവന ഫോം"
+    },
+    "fixed_deposit": {
+        "english": "Fixed Deposit Form",
+        "hindi": "सावधि जमा फॉर्म",
+        "marathi": "मुदत ठेव फॉर्म",
+        "tamil": "நிலையான வைப்பு படிவம்",
+        "telugu": "ఫిక్స్‌ഡ് డిపాజిట్ ఫారమ్",
+        "bengali": "ফিক্সড ডিপোজিট ফর্ম",
+        "kannada": "ಸ್ಥಿರ ಠೇವಣಿ ಫಾರ್ಮ್",
+        "odia": "ସ୍ଥିର ଜମା ଫର୍ମ",
+        "punjabi": "ਫਿਕਸਡ ਡਿਪਾਜ਼ਿਟ ਫਾਰਮ",
+        "gujarati": "ફિક્સ્ડ ડિપોઝિટ ફોર્મ",
+        "malayalam": "സ്ഥിര നിക്ഷേപ ഫോം"
+    },
+    "balance_enquiry": {
+        "english": "Balance Enquiry Form",
+        "hindi": "बैलेंस पूछताछ फॉर्म",
+        "marathi": "शिल्लक चौकशी फॉर्म",
+        "tamil": "இருப்பு விசாரணை படிவம்",
+        "telugu": "బ్యాలెన్స్ విచారణ ఫారమ్",
+        "bengali": "ব্যালেন্স অনুসন্ধান ফর্ম",
+        "kannada": "ಬ್ಯಾಲೆನ್ಸ್ ವಿಚಾರಣೆ ಫಾರ್ಮ್",
+        "odia": "ବ୍ୟାଲେନ୍ସ ଅନୁସନ୍ଧାନ ଫର୍ମ",
+        "punjabi": "ਬੈਲੇਂਸ ਪੁੱਛਗਿੱਛ ਫਾਰਮ",
+        "gujarati": "બેલેન્સ પૂછપરછ ફોર્મ",
+        "malayalam": "ബാലൻസ് അന്വേഷണ ഫോം"
+    },
+    "general": {
+        "english": "General Service Form",
+        "hindi": "सामान्य सेवा फॉर्म",
+        "marathi": "सामान्य सेवा फॉर्म",
+        "tamil": "பொது சேவை படிவம்",
+        "telugu": "సాధారణ సేవా ఫారమ్",
+        "bengali": "সাধারণ পরিষেবা ফর্ম",
+        "kannada": "ಸಾಮಾನ್ಯ ಸೇವಾ ಫಾರ್ಮ್",
+        "odia": "ସାଧାରଣ ସେବା ଫର୍ମ",
+        "punjabi": "ਸਧਾਰਣ ਸੇਵਾ ਫਾਰਮ",
+        "gujarati": "સામાન્ય સેવા ફોર્મ",
+        "malayalam": "பொതു സേവന ഫോം"
+    }
+}
+
+def _make_heading_html(section_key: str, customer_language: str, customer_font: str) -> str:
+    lang_clean = customer_language.lower().strip()
+    trans_en = _HEADING_TRANSLATIONS.get(section_key, _HEADING_TRANSLATIONS["key_points"])["english"]
+    trans_hi = _HEADING_TRANSLATIONS.get(section_key, _HEADING_TRANSLATIONS["key_points"])["hindi"]
+    trans_cust = _HEADING_TRANSLATIONS.get(section_key, _HEADING_TRANSLATIONS["key_points"]).get(lang_clean, "")
+
+    font_hi = _FONT_BOLD if "NotoDevanagari" in _FONT_BOLD else "Helvetica-Bold"
+    font_cust = customer_font if customer_font else "Helvetica-Bold"
+
+    en_block = f'<font name="Helvetica-Bold">{trans_en}</font>'
+    hi_block = f'<font name="{font_hi}">{trans_hi}</font>'
+
+    if trans_cust and trans_cust != trans_hi and lang_clean != "hindi" and lang_clean != "english":
+        cust_block = f'<font name="{font_cust}">{trans_cust}</font>'
+        return f"{en_block}  /  {hi_block}  /  {cust_block}"
+    else:
+        return f"{en_block}  /  {hi_block}"
+
+def _make_form_title_html(intent: Optional[str], customer_language: str, customer_font: str) -> str:
+    key = intent or "general"
+    lang_clean = customer_language.lower().strip()
+    
+    trans_en = _FORM_NAME_TRANSLATIONS.get(key, _FORM_NAME_TRANSLATIONS["general"])["english"]
+    trans_hi = _FORM_NAME_TRANSLATIONS.get(key, _FORM_NAME_TRANSLATIONS["general"])["hindi"]
+    trans_cust = _FORM_NAME_TRANSLATIONS.get(key, _FORM_NAME_TRANSLATIONS["general"]).get(lang_clean, "")
+
+    font_hi = _FONT_BOLD if "NotoDevanagari" in _FONT_BOLD else "Helvetica-Bold"
+    font_cust = customer_font if customer_font else "Helvetica-Bold"
+
+    en_block = f'<font name="Helvetica-Bold">{trans_en}</font>'
+    hi_block = f'<font name="{font_hi}">{trans_hi}</font>'
+
+    if trans_cust and trans_cust != trans_hi and lang_clean != "hindi" and lang_clean != "english":
+        cust_block = f'<font name="{font_cust}">{trans_cust}</font>'
+        return f"{en_block}  /  {hi_block}  /  {cust_block}"
+    else:
+        return f"{en_block}  /  {hi_block}"
+
+
 # PDF SERVICE
-# ══════════════════════════════════════════════════════════════════════════════
 
 class PDFService:
     """
@@ -380,12 +629,10 @@ class PDFService:
     """
 
     def __init__(self) -> None:
-        self._storage_path = Path(
-            os.getenv("SUMMARY_STORAGE_PATH", "./storage/summaries")
-        )
+        self._storage_path = Path(settings.SUMMARY_STORAGE_PATH)
         self._storage_path.mkdir(parents=True, exist_ok=True)
 
-    # ── Public entry point ─────────────────────────────────────────────────────
+    # Public entry point
 
     def generate_bilingual_summary(
         self,
@@ -406,14 +653,14 @@ class PDFService:
         key_points_customer: Any,
         next_steps_hindi: Any,
         next_steps_customer: Any,
-        # ── new optional fields ────────────────────────────────────────────────
+        # new optional fields
         collected_data: Optional[Dict[str, Any]] = None,
         pii_detected: bool = False,
         pii_types_found: Optional[List[str]] = None,
     ) -> str:
         """Generate PDF and return the /storage/summaries/<filename> URL."""
 
-        _try_register_fonts()
+        _try_register_fonts(force=True)
         customer_font = _font_for_language(customer_language)
         st = _make_styles(customer_font)
 
@@ -433,14 +680,12 @@ class PDFService:
 
         story: list = []
 
-        # ══════════════════════════════════════════════════════════════════════
         # PAGE 1: SARALFORM DATA
-        # ══════════════════════════════════════════════════════════════════════
         
-        # 1 ── Header ──────────────────────────────────────────────────────────
+        # 1  Header
         story.extend(self._build_header(st, token_number))
 
-        # 2 ── Meta cards ──────────────────────────────────────────────────────
+        # 2  Meta cards
         story.append(Spacer(1, 4 * mm))
         story.extend(self._build_meta_cards(
             st,
@@ -450,22 +695,28 @@ class PDFService:
             duration_seconds=duration_seconds,
         ))
 
-        # 3. SaralForm Data Table ────────────────────────────────────────────
+        # 3. SaralForm Data Table
         story.append(Spacer(1, 6 * mm))
-        story.extend(self._build_form_data_section(st, collected_data, session_id, token_number, intent=intent_detected))
+        story.extend(self._build_form_data_section(
+            st,
+            collected_data,
+            session_id,
+            token_number,
+            customer_language=customer_language,
+            customer_font=customer_font,
+            intent=intent_detected,
+        ))
 
         # Force Page Break after form data
         story.append(PageBreak())
 
-        # ══════════════════════════════════════════════════════════════════════
         # PAGE 2+: CONVERSATION SUMMARY
-        # ══════════════════════════════════════════════════════════════════════
 
         # Re-add header for the summary page
         story.extend(self._build_header(st, token_number))
         story.append(Spacer(1, 4 * mm))
 
-        # 4 ── Badges row (intent + sentiment + steps) ─────────────────────────
+        # 4  Badges row (intent + sentiment + steps)
         story.append(Spacer(1, 3 * mm))
         story.extend(self._build_badges(
             st,
@@ -474,14 +725,14 @@ class PDFService:
             next_steps_hindi=_as_list(next_steps_hindi),
         ))
 
-        # 5 ── PII alert bar (only if PII was detected) ────────────────────────
+        # 5  PII alert bar (only if PII was detected)
         if pii_detected and pii_types_found:
             story.append(Spacer(1, 3 * mm))
             story.extend(self._build_pii_bar(st, pii_types_found))
 
         story.append(Spacer(1, 5 * mm))
 
-        # 6 ── Key Points ──────────────────────────────────────────────────────
+        # 6  Key Points
         kp_hi   = _as_list(key_points_hindi)
         kp_cust = _as_list(key_points_customer)
         if kp_hi or kp_cust:
@@ -496,7 +747,7 @@ class PDFService:
             ))
             story.append(Spacer(1, 4 * mm))
 
-        # 7 ── Session Summary ─────────────────────────────────────────────────
+        # 7  Session Summary
         sum_hi   = _as_list(summary_hindi)
         sum_cust = _as_list(summary_customer_lang)
         if sum_hi or sum_cust:
@@ -511,7 +762,7 @@ class PDFService:
             ))
             story.append(Spacer(1, 4 * mm))
 
-        # 8 ── Next Steps ──────────────────────────────────────────────────────
+        # 8  Next Steps
         ns_hi   = _as_list(next_steps_hindi)
         ns_cust = _as_list(next_steps_customer)
         if ns_hi or ns_cust:
@@ -523,7 +774,7 @@ class PDFService:
             ))
             story.append(Spacer(1, 5 * mm))
 
-        # 9 ── Footer ──────────────────────────────────────────────────────────
+        # 9  Footer
         story.extend(self._build_footer(st, token_number))
 
         doc.build(story)
@@ -533,28 +784,26 @@ class PDFService:
         pdf_url = storage_service.upload_pdf_file_sync(filepath, filename)
         return pdf_url
 
-    # ══════════════════════════════════════════════════════════════════════════
     # SECTION BUILDERS
-    # ══════════════════════════════════════════════════════════════════════════
 
-    def _build_form_data_section(self, st: dict, data: Optional[Dict[str, Any]], session_id: int, token_number: str, intent: Optional[str] = None) -> list:
+    def _build_form_data_section(
+        self,
+        st: dict,
+        data: Optional[Dict[str, Any]],
+        session_id: int,
+        token_number: str,
+        customer_language: str,
+        customer_font: str,
+        intent: Optional[str] = None,
+    ) -> list:
         """Render SaralForm data in a clean table format and include signature if exists."""
         elements = []
         
-        # Determine Form Name from Intent
-        form_name_map = {
-            "account_opening": "Account Opening Form / खाता खोलने का फॉर्म",
-            "loan_enquiry": "Loan Application Form / ऋण आवेदन फॉर्म",
-            "kyc_update": "KYC Update Form / केवाईसी अपडेट फॉर्म",
-            "card_services": "Card Service Form / कार्ड सेवा फॉर्म",
-            "fixed_deposit": "Fixed Deposit Form / सावधि जमा फॉर्म",
-            "balance_enquiry": "Balance Enquiry Form / बैलेंस पूछताछ फॉर्म",
-            "general": "General Service Form / सामान्य सेवा फॉर्म",
-        }
-        form_display_name = form_name_map.get(intent or "general", "SaralForm Data / सरलफॉर्म डेटा")
+        # Determine Form Name HTML (English / Hindi / Customer Language)
+        form_display_html = _make_form_title_html(intent, customer_language, customer_font)
 
         # Section Title
-        elements.append(Paragraph(form_display_name, st["section_title"]))
+        elements.append(Paragraph(form_display_html, st["section_title"]))
         elements.append(Spacer(1, 3 * mm))
 
         if not data:
@@ -691,7 +940,7 @@ class PDFService:
             
             elements.append(tbl)
 
-        # ── Digital Signature ──────────────────────────────────────────────────
+        # Digital Signature
         elements.append(Spacer(1, 8 * mm))
         
         # Check for signature file
@@ -723,7 +972,7 @@ class PDFService:
         """Blue header bar — logo left, token pill right, red accent below."""
         elements = []
 
-        # ── Try logo ──────────────────────────────────────────────────────────
+        # Try logo
         logo_path = Path(__file__).resolve().parent.parent / "assets" / "website_logo.png"
         if logo_path.is_file():
             logo_cell: Any = Image(str(logo_path), width=130, height=36)
@@ -943,7 +1192,7 @@ class PDFService:
         }
         icon_bg, icon_fg = icon_bgs.get(icon_color, icon_bgs["blue"])
 
-        # ── Helper: section title row ─────────────────────────────────────────
+        # Helper: section title row
         def _lang_bar(label: str, bg: colors.Color) -> Table:
             p = Paragraph(label, ParagraphStyle(
                 "LangBar", fontName=_FONT_BOLD, fontSize=8.5,
@@ -959,11 +1208,14 @@ class PDFService:
             ]))
             return t
 
-        # Section title (English + Hindi)
+        # Section title (English + Hindi + Customer Language)
+        customer_font = _font_for_language(customer_language)
+        title_html = _make_heading_html(section_key, customer_language, customer_font)
+
         title_bar = Table(
-            [[Paragraph(f"{title_en}  /  {title_hi}", ParagraphStyle(
+            [[Paragraph(title_html, ParagraphStyle(
                 "SecTitle", fontName=_FONT_BOLD, fontSize=10,
-                textColor=icon_fg,
+                textColor=icon_fg, leading=14
             ))]],
             colWidths=[_USABLE_W],
         )
@@ -978,7 +1230,7 @@ class PDFService:
         elements.append(title_bar)
         elements.append(Spacer(1, 2 * mm))
 
-        # ── Hindi sub-section ─────────────────────────────────────────────────
+        # Hindi sub-section
         if hindi_items:
             elements.append(_lang_bar("हिंदी (Hindi)", _BLUE))
             elements.extend(self._point_cards(
@@ -989,7 +1241,7 @@ class PDFService:
             ))
             elements.append(Spacer(1, 2 * mm))
 
-        # ── Customer language sub-section ─────────────────────────────────────
+        # Customer language sub-section
         if customer_items:
             elements.append(_lang_bar(customer_language, _RED))
             elements.extend(self._point_cards(
@@ -1063,10 +1315,13 @@ class PDFService:
         elements: list = []
 
         # Section title bar (amber)
+        customer_font = _font_for_language(customer_language)
+        title_html = _make_heading_html("next_steps", customer_language, customer_font)
+
         title_bar = Table(
-            [[Paragraph("Next Steps  /  अगले कदम", ParagraphStyle(
+            [[Paragraph(title_html, ParagraphStyle(
                 "NSTitle", fontName=_FONT_BOLD, fontSize=10,
-                textColor=_AMBER_DARK,
+                textColor=_AMBER_DARK, leading=14
             ))]],
             colWidths=[_USABLE_W],
         )
@@ -1166,9 +1421,7 @@ class PDFService:
             ),
         ]
 
-    # ══════════════════════════════════════════════════════════════════════════
     # P3: FORM AUTO-FILL PDF
-    # ══════════════════════════════════════════════════════════════════════════
 
     # Field display metadata
     _FORM_FIELD_META = {
@@ -1233,10 +1486,10 @@ class PDFService:
 
         story: list = []
 
-        # 1 ── Header ──────────────────────────────────────────────────────
+        # 1  Header
         story.extend(self._build_header(st, token_number))
 
-        # 2 ── Form title bar ─────────────────────────────────────────────
+        # 2  Form title bar
         story.append(Spacer(1, 4 * mm))
         form_ref = self._INTENT_FORM_REF.get(intent_detected or "general", "GQ-601")
         intent_lbl = _intent_label(intent_detected)
@@ -1258,7 +1511,7 @@ class PDFService:
         ]))
         story.append(title_tbl)
 
-        # 3 ── Meta row (branch, staff, completion) ────────────────────────
+        # 3  Meta row (branch, staff, completion)
         story.append(Spacer(1, 3 * mm))
         meta_style = ParagraphStyle(
             "FormMeta", fontName=_FONT_REGULAR, fontSize=8.5,
@@ -1272,7 +1525,7 @@ class PDFService:
         story.append(Paragraph(meta_text, meta_style))
         story.append(Spacer(1, 2 * mm))
 
-        # 4 ── Completion progress bar ─────────────────────────────────────
+        # 4  Completion progress bar
         bar_bg_color = _GREY_LIGHT
         bar_fill_color = (
             _GREEN_DARK if completion_percent >= 75
@@ -1296,7 +1549,7 @@ class PDFService:
         story.append(bar)
         story.append(Spacer(1, 4 * mm))
 
-        # 5 ── Field cards ─────────────────────────────────────────────────
+        # 5  Field cards
         label_style = ParagraphStyle(
             "FieldLabel", fontName=_FONT_BOLD, fontSize=9,
             textColor=_TEXT_SEC, leading=12,
@@ -1358,7 +1611,7 @@ class PDFService:
             story.append(row_tbl)
             story.append(Spacer(1, 1 * mm))
 
-        # 6 ── Signature line ──────────────────────────────────────────────
+        # 6  Signature line
         story.append(Spacer(1, 8 * mm))
         sig_style = ParagraphStyle(
             "SigLine", fontName=_FONT_REGULAR, fontSize=8.5,
@@ -1382,7 +1635,7 @@ class PDFService:
             sig_style,
         ))
 
-        # 7 ── Footer ──────────────────────────────────────────────────────
+        # 7  Footer
         story.append(Spacer(1, 6 * mm))
         generated_at = datetime.now(timezone.utc).strftime("%d %b %Y  %I:%M %p UTC")
         story.append(HRFlowable(
@@ -1405,5 +1658,5 @@ class PDFService:
         return pdf_url
 
 
-# ── Module-level singleton ─────────────────────────────────────────────────────
+# Module-level singleton
 pdf_service = PDFService()

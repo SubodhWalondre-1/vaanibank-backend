@@ -81,9 +81,9 @@ def build_conversation_history(
 
     for row in rows:
         customer_msg = (
-            row.pii_masked_text
+            row.customer_text_translated
+            or row.pii_masked_text
             or row.customer_text_original
-            or row.customer_text_translated
         )
         if customer_msg:
             history.append({"role": "user", "content": customer_msg})

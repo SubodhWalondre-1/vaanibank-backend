@@ -19,9 +19,9 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import Request, status
+from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -56,7 +56,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         app: ASGIApp,
         max_requests: int = 30,
         window_seconds: int = 60,
-    ):
+    ) -> None:
         super().__init__(app)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
@@ -89,7 +89,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         for key in stale_keys:
             del self._requests[key]
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        """
+        Intercept incoming HTTP requests to apply sliding-window rate limits.
+
+        Checks client IP and enforces strict rate limits on expensive AI-heavy routes.
+        """
         path = request.url.path
 
         # Only rate-limit AI-heavy endpoints

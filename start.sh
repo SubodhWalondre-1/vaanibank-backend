@@ -5,6 +5,9 @@ set -e
 
 echo "=== VaaniBank AI Startup ==="
 
+# Clear any conflicting PGSSLMODE environment variables from the parent environment
+unset PGSSLMODE
+
 # 1. Run database migrations
 echo "► Running database migrations (Alembic)..."
 alembic upgrade head

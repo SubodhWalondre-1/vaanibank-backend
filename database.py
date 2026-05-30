@@ -30,13 +30,15 @@ from config import settings
 logger = logging.getLogger("vaanibank.database")
 
 
-# ── SQLAlchemy async engine ────────────────────────────────────────────────────
+# SQLAlchemy async engine
 # psycopg2 sync URL → asyncpg async URL
 _async_db_url: str = settings.DATABASE_URL.replace(
     "postgresql://", "postgresql+asyncpg://"
 ).replace(
     "postgresql+psycopg2://", "postgresql+asyncpg://"
 )
+
+logger.info("DB Engine Init URL: %s", _async_db_url.split("@")[-1] if "@" in _async_db_url else _async_db_url)
 
 engine = create_async_engine(
     _async_db_url,
@@ -47,7 +49,7 @@ engine = create_async_engine(
     pool_recycle=1800,                  # Recycle connections every 30 min
 )
 
-# ── Session factory ────────────────────────────────────────────────────────────
+# Session factory
 AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -57,7 +59,7 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
 )
 
 
-# ── Declarative base ───────────────────────────────────────────────────────────
+# Declarative base
 class Base(DeclarativeBase):
     """
     All ORM models inherit from this base.
@@ -66,7 +68,7 @@ class Base(DeclarativeBase):
     pass
 
 
-# ── FastAPI DB dependency ──────────────────────────────────────────────────────
+# FastAPI DB dependency
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Yield an async DB session per request, then close it.
@@ -85,7 +87,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
-# ── Redis client ───────────────────────────────────────────────────────────────
+# Redis client
 redis_client: aioredis.Redis = aioredis.from_url(
     settings.REDIS_URL,
     encoding="utf-8",
@@ -96,7 +98,7 @@ redis_client: aioredis.Redis = aioredis.from_url(
 )
 
 
-# ── Redis client accessor (non-dependency) ─────────────────────────────────────
+# Redis client accessor (non-dependency)
 async def get_redis_client() -> aioredis.Redis:
     """
     Return the module-level Redis client directly.
@@ -107,7 +109,7 @@ async def get_redis_client() -> aioredis.Redis:
     return redis_client
 
 
-# ── FastAPI Redis dependency ───────────────────────────────────────────────────
+# FastAPI Redis dependency
 async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
     """
     Yield the shared Redis client.
@@ -121,7 +123,7 @@ async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
         pass  # Shared client — do not close per-request
 
 
-# ── Startup health checks ──────────────────────────────────────────────────────
+# Startup health checks
 async def test_connections() -> None:
     """
     Verify PostgreSQL and Redis connectivity at application startup.
@@ -147,7 +149,7 @@ async def test_connections() -> None:
         raise RuntimeError(f"Cannot connect to Redis: {exc}") from exc
 
 
-# ── Graceful shutdown ──────────────────────────────────────────────────────────
+# Graceful shutdown
 async def close_connections() -> None:
     """
     Dispose the SQLAlchemy engine and close the Redis pool.

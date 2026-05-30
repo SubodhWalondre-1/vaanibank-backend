@@ -32,20 +32,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import Session as SessionModel, Branch, StaffMember
 from websocket.manager import ws_manager
+from config import settings
 
-# ── Module logger ─────────────────────────────────────────────────────────────
+# Module logger
 logger = logging.getLogger("vaanibank.forms")
 
-# ── Router ────────────────────────────────────────────────────────────────────
+# Router
 router = APIRouter(prefix="/forms", tags=["SaralForm"])
 
-# ── Signature storage directory ───────────────────────────────────────────────
+# Signature storage directory
 # Configurable via environment variable; defaults to ./storage/signatures
 # The directory is created on module load so the first write never fails.
-_SIGNATURE_DIR: str = os.getenv("SIGNATURE_STORAGE_PATH", "./storage/signatures")
+_SIGNATURE_DIR: str = settings.SIGNATURE_STORAGE_PATH
 os.makedirs(_SIGNATURE_DIR, exist_ok=True)
 
-# ── Human-readable form name lookup ──────────────────────────────────────────
+# Human-readable form name lookup
 # Maps the short form reference codes (used in URLs and DB) to the full
 # display names shown on the staff panel notification.
 _FORM_NAMES: Dict[str, str] = {
@@ -57,7 +58,7 @@ _FORM_NAMES: Dict[str, str] = {
     "GQ-601": "General Query Log",
 }
 
-# ── Intent → form reference mapping ──────────────────────────────────────────
+# Intent → form reference mapping
 # When the frontend sends an intent string, we derive the form_ref from this
 # table so the staff notification shows the correct document name.
 _INTENT_TO_FORM_REF: Dict[str, str] = {
@@ -71,9 +72,7 @@ _INTENT_TO_FORM_REF: Dict[str, str] = {
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # REQUEST / RESPONSE SCHEMAS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class FormSubmitRequest(BaseModel):
     """
@@ -133,9 +132,7 @@ class FormSubmitResponse(BaseModel):
     redirect_to_summary: bool = True  # Tells the frontend to navigate to /summary/:id
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _resolve_form_ref(form_ref: str, intent_detected: str) -> str:
     """
@@ -214,9 +211,7 @@ def _save_signature(
         return None
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # POST /forms/submit
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/submit",
@@ -247,7 +242,7 @@ async def submit_form(
       8. Return success response to the customer panel.
     """
 
-    # ── Step 1: Validate Session ──────────────────────────────────────────────
+    # Step 1: Validate Session
     result = await db.execute(
         select(SessionModel).where(SessionModel.id == body.session_id)
     )
@@ -264,7 +259,7 @@ async def submit_form(
                    f"The session may have already been purged.",
         )
 
-    # ── Step 2: Resolve form reference ────────────────────────────────────────
+    # Step 2: Resolve form reference
     form_ref: str = _resolve_form_ref(body.form_ref, body.intent_detected)
     form_name: str = _FORM_NAMES.get(form_ref, "Banking Form")
 
@@ -273,13 +268,13 @@ async def submit_form(
         body.token_number, body.session_id, form_ref, len(body.confirmed_fields),
     )
 
-    # ── Step 3: Merge confirmed_fields → collected_data ───────────────────────
+    # Step 3: Merge confirmed_fields → collected_data
     # Customer corrections take priority over whatever the LLM extracted.
     # We do a shallow merge (top-level keys only); nested JSONB is preserved.
     existing_data: dict = session_obj.collected_data or {}
     merged_data: dict = {**existing_data, **body.confirmed_fields}
 
-    # ── Step 4: Persist merged data + timestamp ───────────────────────────────
+    # Step 4: Persist merged data + timestamp
     signed_at: datetime = datetime.now(timezone.utc)
 
     await db.execute(
@@ -291,7 +286,7 @@ async def submit_form(
         )
     )
 
-    # ── Step 4b: Force PDF regeneration if summary exists ─────────────────────
+    # Step 4b: Force PDF regeneration if summary exists
     # We reset the pdf_generated flag so the next Export PDF call generates
     # a fresh PDF with the latest collected_data and signature.
     from models import BilingualSummary
@@ -301,7 +296,7 @@ async def submit_form(
         .values(pdf_generated=False)
     )
 
-    # ── Step 5: Save signature PNG (best-effort) ──────────────────────────────
+    # Step 5: Save signature PNG (best-effort)
     # We do this before commit so if it fails, we still have the data.
     # But it's independent of the DB transaction.
     signature_url: Optional[str] = _save_signature(
@@ -311,10 +306,10 @@ async def submit_form(
     )
     signature_saved: bool = signature_url is not None
 
-    # ── Step 6: Commit DB transaction ─────────────────────────────────────────
+    # Step 6: Commit DB transaction
     await db.commit()
 
-    # ── Step 6b: Proactively trigger PDF generation task ──────────────────────
+    # Step 6b: Proactively trigger PDF generation task
     # We do this AFTER commit so the background task can see the latest DB state
     # if it needs to fetch fallback data.
     try:
@@ -386,7 +381,7 @@ async def submit_form(
         len(body.confirmed_fields), signature_saved, signed_at.isoformat(),
     )
 
-    # ── Step 7: Notify staff panel via WebSocket ──────────────────────────────
+    # Step 7: Notify staff panel via WebSocket
     # This is a fire-and-forget call.  If the staff WS is not connected the
     # event is silently dropped — the form data is already persisted in the DB
     # and the staff can still download the signature via GET /forms/signature/{token}.
@@ -432,7 +427,7 @@ async def submit_form(
             body.token_number, ws_exc,
         )
 
-    # ── Step 8: Return success to customer panel ──────────────────────────────
+    # Step 8: Return success to customer panel
     return FormSubmitResponse(
         success=True,
         message="Form submitted successfully. Returning to your session.",
@@ -444,9 +439,7 @@ async def submit_form(
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════════
 # GET /forms/signature/{token_number}
-# ══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/signature/{token_number}",
@@ -488,7 +481,7 @@ async def get_signature(
             detail="Invalid token number format.",
         )
 
-    # ── Verify session exists in DB to break the taint trace from request parameters ──
+    # Verify session exists in DB to break the taint trace from request parameters
     # Rather than using request parameters directly, we fetch the verified token/id from PostgreSQL.
     query = select(SessionModel).where(SessionModel.token_number == token_number)
     if session_id is not None:
@@ -510,7 +503,7 @@ async def get_signature(
     db_session_id = session_obj.id
     safe_token: str = db_token.replace("-", "_")
 
-    # ── Attempt 1: exact file by session_id ───────────────────────────────────
+    # Attempt 1: exact file by session_id
     if session_id is not None:
         filepath = os.path.join(
             _SIGNATURE_DIR, f"signature_{safe_token}_{db_session_id}.png"
@@ -520,7 +513,7 @@ async def get_signature(
     else:
         filepath = None
 
-    # ── Attempt 2: scan directory for any matching file ───────────────────────
+    # Attempt 2: scan directory for any matching file
     if filepath is None:
         try:
             prefix = f"signature_{safe_token}_"
@@ -531,7 +524,7 @@ async def get_signature(
         except OSError as exc:
             logger.error("Signature directory scan failed: %s", exc)
 
-    # ── 404 if still not found ────────────────────────────────────────────────
+    # 404 if still not found
     if not filepath or not os.path.exists(filepath):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -541,7 +534,7 @@ async def get_signature(
             ),
         )
 
-    # ── Verify canonical path boundary check to prevent directory traversal ───
+    # Verify canonical path boundary check to prevent directory traversal
     real_dir = os.path.abspath(_SIGNATURE_DIR)
     real_filepath = os.path.abspath(filepath)
     if not real_filepath.startswith(real_dir + os.path.sep):
@@ -551,7 +544,7 @@ async def get_signature(
             detail="Access denied.",
         )
 
-    # ── Read and return the PNG ───────────────────────────────────────────────
+    # Read and return the PNG
     with open(filepath, "rb") as fh:
         image_bytes: bytes = fh.read()
 

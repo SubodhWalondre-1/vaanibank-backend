@@ -1,4 +1,3 @@
-# ============================================================================
 # VaaniBank AI — Intent Guidance Configuration
 # PSBs Hackathon 2026 | Team Vectora
 #
@@ -8,7 +7,6 @@
 #
 # To add a new intent (e.g., insurance, locker), simply add a new top-level
 # key here — no code changes required.
-# ============================================================================
 
 account_opening: |
   === INTENT: ACCOUNT OPENING ===
