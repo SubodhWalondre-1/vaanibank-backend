@@ -371,10 +371,12 @@ async def translate_staff_response(
     Used when staff writes their own response (Own button) and needs it
     translated before TTS generation.
     """
+    has_indian_chars = any(ord(c) > 127 for c in body.text)
+    src_lang = "hi" if has_indian_chars else "en"
     translated = await ai_service.translate_text(
         text=body.text,
         target_language_code=body.target_language_code,
-        source_language_code="hi",
+        source_language_code=src_lang,
     )
 
     if not translated:

@@ -791,7 +791,7 @@ async def _send_whatsapp_background(
     pdf_url: str,
     phone_number: Optional[str],
 ) -> None:
-    """Background task: send WhatsApp message via Twilio Business API."""
+    """Background task: send WhatsApp message (demo mode — uses WhatsApp Web URL)."""
     logger.info(
         "WhatsApp send | summary_id=%d | pdf=%s | phone=%s",
         summary_id,
@@ -852,36 +852,13 @@ async def _send_whatsapp_background(
         base_url = settings.R2_PUBLIC_URL or "https://api.vaanibank.in"
         absolute_pdf_url = f"{base_url}{pdf_url}"
 
-    # 5. Trigger delivery via Twilio SDK (or mock if demo mode)
-    has_credentials = bool(settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN)
-    
-    if has_credentials:
-        try:
-            from twilio.rest import Client
-            client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-            
-            message_body = (
-                f"🏦 *Union Bank of India — VaaniBank AI*\n\n"
-                f"Here is your bilingual conversation summary.\n\n"
-                f"📝 *Key Points Highlight:*\n{summary_preview}\n\n"
-                f"📄 *Bilingual Session PDF:* {absolute_pdf_url}"
-            )
-            
-            # Send WhatsApp message
-            message = client.messages.create(
-                from_=settings.TWILIO_WHATSAPP_FROM,
-                body=message_body,
-                to=to_whatsapp
-            )
-            logger.info("Twilio WhatsApp message sent successfully | SID=%s", message.sid)
-        except Exception as twilio_err:
-            logger.error("Failed to send WhatsApp via Twilio SDK: %s", twilio_err)
-            # We don't block DB update if Twilio rejects so the local DB flow doesn't hang
-    else:
-        logger.warning(
-            "Twilio credentials not configured. Executing in DEMO mock mode for phone=%s",
-            clean_phone,
-        )
+    # 5. Demo mode — log the message that would be sent
+    logger.info(
+        "WhatsApp delivery (demo mode) | to=%s | pdf=%s | preview=%s",
+        to_whatsapp,
+        absolute_pdf_url,
+        summary_preview[:100],
+    )
 
     # 6. Update database record status
     try:

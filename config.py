@@ -131,6 +131,16 @@ class Settings(BaseSettings):
         description="Gemini model identifier for backup LLM",
     )
 
+    # OpenRouter (LLM fallback 2)
+    OPENROUTER_API_KEY: str = Field(
+        default="",
+        description="OpenRouter API key for backup LLM",
+    )
+    OPENROUTER_MODEL: str = Field(
+        default="google/gemma-4-31b-it:free",
+        description="OpenRouter model identifier for backup LLM",
+    )
+
     # File Storage
     AUDIO_STORAGE_PATH: str = Field(
         default="./storage/audio",
@@ -154,20 +164,6 @@ class Settings(BaseSettings):
     R2_SECRET_ACCESS_KEY: str = Field(default="", description="Cloudflare R2 Secret Access Key")
     R2_BUCKET_NAME: str = Field(default="", description="Cloudflare R2 Bucket Name")
     R2_PUBLIC_URL: str = Field(default="", description="Cloudflare R2 Public URL")
-
-    # Twilio Configuration
-    TWILIO_ACCOUNT_SID: str = Field(
-        default="",
-        description="Twilio Account SID",
-    )
-    TWILIO_AUTH_TOKEN: str = Field(
-        default="",
-        description="Twilio Auth Token",
-    )
-    TWILIO_WHATSAPP_FROM: str = Field(
-        default="whatsapp:+14155238886",
-        description="Twilio WhatsApp Sender Number (prefixed with whatsapp:)",
-    )
 
     # App
     APP_ENV: str = Field(

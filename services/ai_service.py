@@ -593,6 +593,44 @@ class AIService:
                     self._gemini_circuit_open_until = time.time() + self._GEMINI_COOLDOWN_SECONDS
                 raise e
 
+        async def call_openrouter() -> str:
+            if not settings.OPENROUTER_API_KEY:
+                raise LLMError(message="OpenRouter credentials not configured in .env", model="openrouter")
+            try:
+                headers = {
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://vaanibank.ai",
+                    "X-Title": "VaaniBank AI",
+                }
+                payload = {
+                    "model": settings.OPENROUTER_MODEL or "google/gemini-2.0-flash:free",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        *messages,
+                    ],
+                    "temperature": 0.3,
+                }
+                response = await self._http_client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=15.0
+                )
+                if response.status_code != 200:
+                    raise LLMError(
+                        message=f"OpenRouter HTTP {response.status_code}: {response.text}",
+                        model="openrouter"
+                    )
+                data = response.json()
+                choices = data.get("choices", [])
+                if not choices:
+                    raise LLMError(message="OpenRouter returned empty choices", model="openrouter")
+                return choices[0].get("message", {}).get("content", "")
+            except Exception as e:
+                logger.error("OpenRouter fallback failed: %s", e)
+                raise e
+
         # Fetch Dynamic Settings for LLM
         from services.settings_service import settings_service
         dyn_settings = await settings_service.get_all_settings()
@@ -614,11 +652,17 @@ class AIService:
                     llm_source = "groq"
                     logger.info("✅ Groq fallback succeeded")
                 except Exception as groq_exc:
-                    logger.error("Both LLMs failed under Gemini-primary mode")
-                    raise LLMError(
-                        message="Both Gemini and Groq LLMs failed. Please try again.",
-                        model="gemini+groq",
-                    ) from groq_exc
+                    logger.warning("Groq fallback failed: %s — trying OpenRouter fallback", groq_exc)
+                    try:
+                        raw = await call_openrouter()
+                        llm_source = "openrouter"
+                        logger.info("✅ OpenRouter fallback succeeded")
+                    except Exception as or_exc:
+                        logger.error("All LLMs failed under Gemini-primary mode")
+                        raise LLMError(
+                            message="All primary and fallback LLMs (Gemini, Groq, OpenRouter) failed. Please try again.",
+                            model="gemini+groq+openrouter",
+                        ) from or_exc
         else:
             # Groq is primary
             try:
@@ -632,11 +676,17 @@ class AIService:
                     llm_source = "gemini"
                     logger.info("✅ Gemini fallback succeeded")
                 except Exception as gemini_exc:
-                    logger.error("Both LLMs failed under Groq-primary mode")
-                    raise LLMError(
-                        message="Both Groq and Gemini LLMs failed. Please try again.",
-                        model="groq+gemini",
-                    ) from gemini_exc
+                    logger.warning("Gemini fallback failed: %s — trying OpenRouter fallback", gemini_exc)
+                    try:
+                        raw = await call_openrouter()
+                        llm_source = "openrouter"
+                        logger.info("✅ OpenRouter fallback succeeded")
+                    except Exception as or_exc:
+                        logger.error("All LLMs failed under Groq-primary mode")
+                        raise LLMError(
+                            message="All primary and fallback LLMs (Groq, Gemini, OpenRouter) failed. Please try again.",
+                            model="groq+gemini+openrouter",
+                        ) from or_exc
 
 
         # Parse JSON (same logic for both Groq and Gemini)
@@ -1147,10 +1197,31 @@ class AIService:
         "आपका mobile number क्या है?": "What is your mobile number?",
     }
 
+    def _normalize_text(self, text: str) -> str:
+        if not text:
+            return ""
+        import re
+        # Remove common punctuation: ? ! . , ।
+        text = re.sub(r'[?!.,।]', '', text)
+        # Normalize whitespace
+        text = " ".join(text.split())
+        return text.lower()
+
+    def _has_indian_chars(self, text: str) -> bool:
+        if not text:
+            return False
+        import re
+        # Match any character outside standard ASCII range (non-ASCII)
+        return bool(re.search(r'[^\x00-\x7F]', text))
+
     async def translate_to_english(self, text: str) -> str:
         """
-        Translate any Indian language text to English using the shared
-        AsyncGroq client (connection-pooled, non-blocking).
+        Translate any Indian language text to English using a multi-engine fallback chain:
+        1. Predefined dictionary (with text normalization)
+        2. Groq LLaMA (llama-3.3-70b-versatile, fallback: llama-3.1-8b-instant)
+        3. Google Gemini (gemini-2.0-flash)
+        4. OpenRouter (google/gemini-2.0-flash:free)
+        5. Sarvam Translate (formal, mayura:v1)
 
         Returns the translated text, or the original text on failure.
         """
@@ -1158,11 +1229,19 @@ class AIService:
             return "—"
 
         # Check standard translations dictionary first (zero-latency, offline friendly)
-        normalized_text = text.strip()
-        if normalized_text in self._BANKING_TRANSLATIONS:
-            return self._BANKING_TRANSLATIONS[normalized_text]
+        normalized_text = self._normalize_text(text)
+        
+        # Build normalized lookup dictionary on the fly (or cache it)
+        if not hasattr(self, "_normalized_banking_translations"):
+            self._normalized_banking_translations = {
+                self._normalize_text(k): v for k, v in self._BANKING_TRANSLATIONS.items()
+            }
+            
+        if normalized_text in self._normalized_banking_translations:
+            logger.info("Translation cache hit (predefined) for: %s", text[:40])
+            return self._normalized_banking_translations[normalized_text]
 
-        # Primary translation channel: Groq LLaMA
+        # 1. Groq LLaMA
         try:
             completion = await self._call_groq_with_fallback(
                 model=settings.GROQ_MODEL,
@@ -1183,11 +1262,15 @@ class AIService:
             )
             result = (completion.choices[0].message.content or "").strip()
             if result:
-                return result
+                # If result is identical to input and input has Indian chars, the model failed/echoed
+                if result.strip() != text.strip() or not self._has_indian_chars(text):
+                    return result
+                else:
+                    logger.warning("Groq translate returned identical text; trying next fallback.")
         except Exception as exc:
             logger.warning("Groq translate_to_english failed: %s — trying Gemini fallback", exc)
 
-        # Fallback translation channel: Gemini
+        # 2. Gemini Fallback
         if self._gemini_model is not None:
             try:
                 gemini_prompt = (
@@ -1201,9 +1284,83 @@ class AIService:
                 )
                 result = (gemini_response.text or "").strip()
                 if result:
-                    return result
+                    if result.strip() != text.strip() or not self._has_indian_chars(text):
+                        return result
+                    else:
+                        logger.warning("Gemini translate returned identical text; trying next fallback.")
             except Exception as gemini_exc:
-                logger.warning("Gemini translate_to_english fallback failed: %s", gemini_exc)
+                logger.warning("Gemini translate_to_english fallback failed: %s — trying OpenRouter fallback", gemini_exc)
+
+        # 3. OpenRouter Fallback
+        if settings.OPENROUTER_API_KEY:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://vaanibank.ai",
+                    "X-Title": "VaaniBank AI",
+                }
+                payload = {
+                    "model": settings.OPENROUTER_MODEL or "google/gemini-2.0-flash:free",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a professional bank translator. Translate the given text to English. "
+                                "Return ONLY the English translation, nothing else. "
+                                "No explanations, no quotes, just the translated text."
+                            ),
+                        },
+                        {"role": "user", "content": text},
+                    ],
+                    "temperature": 0.1,
+                }
+                response = await self._http_client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=15.0
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        result = (choices[0].get("message", {}).get("content", "")).strip()
+                        if result:
+                            if result.strip() != text.strip() or not self._has_indian_chars(text):
+                                return result
+                            else:
+                                logger.warning("OpenRouter translate returned identical text; trying next fallback.")
+            except Exception as or_exc:
+                logger.warning("OpenRouter translate_to_english fallback failed: %s — trying Sarvam Translate fallback", or_exc)
+
+        # 4. Sarvam Translate Fallback (hi-IN -> en-IN)
+        if settings.SARVAM_API_KEY:
+            try:
+                resp = await self._http_client.post(
+                    "https://api.sarvam.ai/translate",
+                    headers={
+                        "api-subscription-key": settings.SARVAM_API_KEY,
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "input": text,
+                        "source_language_code": "hi-IN",
+                        "target_language_code": "en-IN",
+                        "speaker_gender": "Female",
+                        "mode": "formal",
+                        "model": "mayura:v1",
+                        "enable_preprocessing": True,
+                    },
+                    timeout=15.0,
+                )
+                if resp.status_code == 200:
+                    result = resp.json().get("translated_text", "").strip()
+                    if result:
+                        if result.strip() != text.strip() or not self._has_indian_chars(text):
+                            return result
+            except Exception as sarvam_exc:
+                logger.warning("Sarvam translate_to_english fallback failed: %s", sarvam_exc)
 
         return text  # final graceful fallback
 

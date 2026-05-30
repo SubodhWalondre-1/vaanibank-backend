@@ -261,15 +261,18 @@ class HandlersMixin:
         if short_lang and short_lang != "hi" and customer_text == response_text:
             try:
                 from services.ai_service import ai_service
+                has_indian_chars = any(ord(c) > 127 for c in response_text)
+                src_lang = "hi" if has_indian_chars else "en"
                 translated = await ai_service.translate_text(
                     text=response_text,
                     target_language_code=real_lang_code,
+                    source_language_code=src_lang,
                 )
                 if translated:
                     customer_text = translated
                     logger.info(
-                        "LLM fallback translation used | token=%s | lang=%s",
-                        token_number, real_lang_code,
+                        "LLM fallback translation used | token=%s | lang=%s | src_lang=%s",
+                        token_number, real_lang_code, src_lang,
                     )
             except Exception as exc:
                 logger.warning(
