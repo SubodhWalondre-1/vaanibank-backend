@@ -104,10 +104,10 @@ STAFF_DATA: List[Dict[str, Any]] = [
         "is_active": True,
     },
     {
-        "staff_id": "UBI-MUM-042",
-        "username": "admin",
-        "password_plain": "admin123",
-        "full_name": "Amit Patel",
+        "staff_id": settings.ADMIN_STAFF_ID,
+        "username": settings.ADMIN_USERNAME,
+        "password_plain": settings.ADMIN_PASSWORD,
+        "full_name": settings.ADMIN_FULL_NAME,
         "role": "admin",
         "branch_code": "MUM-AND-01",
         "languages_known": ["Hindi", "Gujarati", "English"],
@@ -529,11 +529,24 @@ def seed_branches(db: SyncSession) -> Dict[str, Branch]:
 def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
     """Insert all staff members, linking to correct branch."""
     for sdata in STAFF_DATA:
-        existing = db.execute(
-            select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
-        ).scalar_one_or_none()
+        if sdata["role"] == "admin":
+            existing = db.execute(
+                select(StaffMember).where(StaffMember.role == "admin")
+            ).scalar_one_or_none()
+        else:
+            existing = db.execute(
+                select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
+            ).scalar_one_or_none()
+
         if existing:
-            print(f"  [SKIP] Staff '{sdata['username']}' already exists (id={existing.id})")
+            # Update fields dynamically in case they changed in settings
+            existing.staff_id = sdata["staff_id"]
+            existing.username = sdata["username"]
+            existing.password_hash = pwd_context.hash(sdata["password_plain"])
+            existing.full_name = sdata["full_name"]
+            existing.languages_known = sdata["languages_known"]
+            db.flush()
+            print(f"  [UPD]  Staff '{sdata['username']}' updated with latest settings (id={existing.id})")
             continue
         branch = branch_map[sdata["branch_code"]]
         staff = StaffMember(

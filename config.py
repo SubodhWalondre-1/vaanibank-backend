@@ -59,6 +59,24 @@ class Settings(BaseSettings):
         description="Token expiry in hours (1–72)",
     )
 
+    # Admin Credentials
+    ADMIN_USERNAME: str = Field(
+        default="admin",
+        description="Default administrator username for seeding",
+    )
+    ADMIN_PASSWORD: str = Field(
+        default="admin123",
+        description="Default administrator password for seeding",
+    )
+    ADMIN_STAFF_ID: str = Field(
+        default="UBI-MUM-042",
+        description="Default administrator staff ID for seeding",
+    )
+    ADMIN_FULL_NAME: str = Field(
+        default="Amit Patel",
+        description="Default administrator full name for seeding",
+    )
+
     # Sarvam AI
     SARVAM_API_KEY: str = Field(
         default="",

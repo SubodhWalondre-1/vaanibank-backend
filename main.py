@@ -135,14 +135,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         DEMO_STAFF = [
             {"staff_id": "UBI-NGP-001", "username": "demo",    "password_plain": "demo123",    "full_name": "Rajesh Kumar",  "role": "teller",     "branch_code": "NGP-CVL-01", "languages_known": ["Hindi", "Marathi"]},
             {"staff_id": "UBI-NGP-002", "username": "manager", "password_plain": "manager123", "full_name": "Priya Sharma",  "role": "manager",    "branch_code": "NGP-CVL-01", "languages_known": ["Hindi", "English"]},
-            {"staff_id": "UBI-MUM-042", "username": "admin",   "password_plain": "admin123",   "full_name": "Amit Patel",    "role": "admin",      "branch_code": "MUM-AND-01", "languages_known": ["Hindi", "Gujarati", "English"]},
+            {"staff_id": settings.ADMIN_STAFF_ID, "username": settings.ADMIN_USERNAME, "password_plain": settings.ADMIN_PASSWORD, "full_name": settings.ADMIN_FULL_NAME, "role": "admin",      "branch_code": "MUM-AND-01", "languages_known": ["Hindi", "Gujarati", "English"]},
         ]
         async with AsyncSession(engine) as seed_db:
             for sdata in DEMO_STAFF:
-                existing = (await seed_db.execute(
-                    sa_select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
-                )).scalar_one_or_none()
+                if sdata["role"] == "admin":
+                    existing = (await seed_db.execute(
+                        sa_select(StaffMember).where(StaffMember.role == "admin")
+                    )).scalar_one_or_none()
+                else:
+                    existing = (await seed_db.execute(
+                        sa_select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
+                    )).scalar_one_or_none()
+
                 if existing:
+                    # Update fields dynamically in case they changed in settings
+                    existing.staff_id = sdata["staff_id"]
+                    existing.username = sdata["username"]
+                    existing.password_hash = pwd_ctx.hash(sdata["password_plain"])
+                    existing.full_name = sdata["full_name"]
+                    existing.languages_known = sdata["languages_known"]
                     continue
                 branch = (await seed_db.execute(
                     sa_select(Branch).where(Branch.branch_code == sdata["branch_code"])
