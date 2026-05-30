@@ -20,7 +20,19 @@ Uses synchronous SQLAlchemy — no asyncio required.
 from __future__ import annotations
 
 import sys
+import types
 from typing import Any, Dict, List
+
+# Silence passlib / bcrypt version mismatch warning
+# passlib 1.7.4 reads bcrypt.__about__.__version__ — bcrypt 4.x removed __about__
+try:
+    import bcrypt as _bcrypt_lib
+    if not hasattr(_bcrypt_lib, "__about__"):
+        _about = types.ModuleType("__about__")
+        _about.__version__ = getattr(_bcrypt_lib, "__version__", "4.0.0")
+        _bcrypt_lib.__about__ = _about  # type: ignore
+except ImportError:
+    pass
 
 from passlib.context import CryptContext
 from sqlalchemy import create_engine, select
