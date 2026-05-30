@@ -139,13 +139,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         ]
         async with AsyncSession(engine) as seed_db:
             for sdata in DEMO_STAFF:
-                if sdata["role"] == "admin":
+                # Check by staff_id first to prevent unique constraint violation
+                existing = (await seed_db.execute(
+                    sa_select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
+                )).scalar_one_or_none()
+
+                # If not found by staff_id, and it's the admin, find the existing admin by role
+                if not existing and sdata["role"] == "admin":
                     existing = (await seed_db.execute(
                         sa_select(StaffMember).where(StaffMember.role == "admin")
-                    )).scalar_one_or_none()
-                else:
-                    existing = (await seed_db.execute(
-                        sa_select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
                     )).scalar_one_or_none()
 
                 if existing:

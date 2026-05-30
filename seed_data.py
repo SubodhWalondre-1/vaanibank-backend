@@ -529,13 +529,15 @@ def seed_branches(db: SyncSession) -> Dict[str, Branch]:
 def seed_staff(db: SyncSession, branch_map: Dict[str, Branch]) -> None:
     """Insert all staff members, linking to correct branch."""
     for sdata in STAFF_DATA:
-        if sdata["role"] == "admin":
+        # Check by staff_id first to prevent unique constraint violation
+        existing = db.execute(
+            select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
+        ).scalar_one_or_none()
+
+        # If not found by staff_id, and it's the admin, find the existing admin by role
+        if not existing and sdata["role"] == "admin":
             existing = db.execute(
                 select(StaffMember).where(StaffMember.role == "admin")
-            ).scalar_one_or_none()
-        else:
-            existing = db.execute(
-                select(StaffMember).where(StaffMember.staff_id == sdata["staff_id"])
             ).scalar_one_or_none()
 
         if existing:
