@@ -33,17 +33,5 @@ python download_models.py
 # Create storage directories
 mkdir -p storage/audio storage/summaries
 
-# Run database migrations (creates all tables)
-echo "Running Alembic migrations..."
-alembic upgrade head
-
-# Run standalone migration to add Gujarati/Malayalam columns
-echo "Running Gujarati and Malayalam column migration..."
-python migrate_add_gu_ml_columns.py
-
-# Seed initial data (branches, staff, process steps)
-echo "Seeding database..."
-python seed_data.py
-
 echo "Build complete — VaaniBank AI backend ready"
 

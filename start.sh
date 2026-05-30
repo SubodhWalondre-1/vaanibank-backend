@@ -21,5 +21,5 @@ echo "► Seeding database with branch, teller, and process parameters..."
 python seed_data.py
 
 # 4. Start Uvicorn ASGI server
-echo "► Starting FastAPI application (port 7860)..."
-exec uvicorn main:app --host 0.0.0.0 --port 7860 --ws-ping-interval 20 --ws-ping-timeout 20
+echo "► Starting FastAPI application (port ${PORT:-7860})..."
+exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860} --ws-ping-interval 20 --ws-ping-timeout 20
