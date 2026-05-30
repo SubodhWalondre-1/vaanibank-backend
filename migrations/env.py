@@ -42,11 +42,12 @@ from config import settings
 config = context.config
 
 # Override sqlalchemy.url with the value from our settings singleton
-# Convert sync psycopg2 URL → asyncpg URL if needed
 _async_url = settings.DATABASE_URL.replace(
     "postgresql://", "postgresql+asyncpg://"
 ).replace(
     "postgresql+psycopg2://", "postgresql+asyncpg://"
+).replace(
+    "postgres://", "postgresql+asyncpg://"
 )
 print("ALEMBIC TARGET URL:", _async_url.split("@")[-1] if "@" in _async_url else _async_url)
 config.set_main_option("sqlalchemy.url", _async_url)

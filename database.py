@@ -31,11 +31,12 @@ logger = logging.getLogger("vaanibank.database")
 
 
 # SQLAlchemy async engine
-# psycopg2 sync URL → asyncpg async URL
 _async_db_url: str = settings.DATABASE_URL.replace(
     "postgresql://", "postgresql+asyncpg://"
 ).replace(
     "postgresql+psycopg2://", "postgresql+asyncpg://"
+).replace(
+    "postgres://", "postgresql+asyncpg://"
 )
 
 logger.info("DB Engine Init URL: %s", _async_db_url.split("@")[-1] if "@" in _async_db_url else _async_db_url)
