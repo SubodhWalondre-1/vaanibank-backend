@@ -11,6 +11,8 @@ The router endpoints now validate auth / session, then delegate to this service.
 
 from __future__ import annotations
 
+import asyncio
+
 import logging
 import re
 import time
@@ -248,12 +250,28 @@ async def run_transcription_pipeline(
     from services.settings_service import settings_service
     dyn_settings = await settings_service.get_all_settings()
 
-    # 2. Determine exchange number
+    # 2. Determine exchange number & fetch session collected_data in a single DB query (Change 7A)
+    prev_collected = {}
     if exchange_number is None:
-        count_result = await db.execute(
-            select(func.count(Exchange.id)).where(Exchange.session_id == session_id)
+        db_res = await db.execute(
+            select(
+                func.count(Exchange.id).label("ex_count"),
+                Session.collected_data,
+            )
+            .select_from(Session)
+            .outerjoin(Exchange, Exchange.session_id == Session.id)
+            .where(Session.id == session_id)
+            .group_by(Session.id)
         )
-        exchange_number = (count_result.scalar() or 0) + 1
+        row = db_res.one_or_none()
+        if row:
+            exchange_number = (row[0] or 0) + 1
+            prev_collected = row[1] or {}
+    else:
+        cd_result = await db.execute(
+            select(Session.collected_data).where(Session.id == session_id)
+        )
+        prev_collected = cd_result.scalar() or {}
 
     # Enforce maximum exchanges per session
     max_exchanges = dyn_settings.get("max_exchanges_per_session", 50)
@@ -336,15 +354,7 @@ async def run_transcription_pipeline(
     suggested_customer = ""
 
     try:
-        # Fetch previously accumulated collected_info
-        prev_collected = {}
-        try:
-            cd_result = await db.execute(
-                select(Session.collected_data).where(Session.id == session_id)
-            )
-            prev_collected = cd_result.scalar() or {}
-        except Exception:
-            prev_collected = {}
+        # prev_collected already fetched in the combined startup query
 
         # Build conversation history
         conversation_history = build_conversation_history(
@@ -372,15 +382,18 @@ async def run_transcription_pipeline(
             intent=pre_intent,
         )
 
-        _rag_result = await rag_service.retrieve(
-            query=_rag_query,
-            intent=pre_intent,
-            product=prev_collected.get("loan_type") or prev_collected.get("account_type"),
+        # Fire RAG and UBI KB concurrently (Change 2A)
+        rag_task = asyncio.create_task(
+            rag_service.retrieve(
+                query=_rag_query,
+                intent=pre_intent,
+                product=prev_collected.get("loan_type") or prev_collected.get("account_type"),
+            )
         )
-        rag_context_block = rag_service.format_context_for_llm(_rag_result)
+        ubi_task = asyncio.create_task(_load_ubi_knowledge_base(intent=pre_intent))
+        _rag_result, _ubi_kb_ctx = await asyncio.gather(rag_task, ubi_task)
 
-        # Inject Official UBI Knowledge Base
-        _ubi_kb_ctx = await _load_ubi_knowledge_base(intent=pre_intent)
+        rag_context_block = rag_service.format_context_for_llm(_rag_result)
         if _ubi_kb_ctx:
             if not rag_context_block:
                 rag_context_block = _ubi_kb_ctx
@@ -460,27 +473,81 @@ async def run_transcription_pipeline(
             except Exception as ovr_exc:
                 logger.debug("Suggestion override check failed (non-fatal): %s", ovr_exc)
 
-        # Translate the suggested Hindi response to the customer's language using the dedicated translation service
-        # to prevent hybrid Hindi-Marathi mixed text.
+        # Fire suggestion translation and Hindi translation verification concurrently (Change 2B)
+        translate_suggestion_task = None
         source_lang_prefix = (language_code or "hi").split("-")[0].lower()
         if source_lang_prefix != "hi" and _final_hindi:
-            try:
-                _translated_suggested = await ai_service.translate_text(
+            translate_suggestion_task = asyncio.create_task(
+                ai_service.translate_text(
                     text=_final_hindi,
                     target_language_code=language_code,
                     source_language_code="hi",
                 )
+            )
+
+        _hindi_translation = llm_result.translation
+        source_lang_code = (language_code or "hi").split("-")[0].lower()
+
+        async def verify_and_retry_hindi():
+            nonlocal _hindi_translation
+            if _needs_hindi_translation_retry(
+                original_text=customer_text_for_ai,
+                candidate_text=_hindi_translation,
+                source_language_code=source_lang_code,
+            ):
+                logger.warning(
+                    "LLM translation still looks like source language (lang=%s) — forcing Hindi translate",
+                    source_lang_code,
+                )
+                try:
+                    _forced_hi = await ai_service.translate_text(
+                        text=customer_text_for_ai,
+                        target_language_code="hi",
+                        source_language_code=source_lang_code,
+                    )
+                    if _forced_hi and not _needs_hindi_translation_retry(
+                        original_text=customer_text_for_ai,
+                        candidate_text=_forced_hi,
+                        source_language_code=source_lang_code,
+                    ):
+                        _hindi_translation = _forced_hi
+                except Exception as _tr_exc:
+                    logger.warning("Forced Hindi translation failed (non-fatal): %s", _tr_exc)
+
+            if _needs_hindi_translation_retry(
+                original_text=customer_text_for_ai,
+                candidate_text=_hindi_translation,
+                source_language_code=source_lang_code,
+            ):
+                _fallback_hi = _fallback_source_to_hindi(
+                    customer_text_for_ai,
+                    source_lang_code,
+                )
+                if _fallback_hi:
+                    _hindi_translation = _fallback_hi
+                    logger.info(
+                        "Hindi translation corrected with local fallback | token=%s | text=%s",
+                        token_number, _hindi_translation[:60],
+                    )
+
+        verify_task = asyncio.create_task(verify_and_retry_hindi())
+
+        if translate_suggestion_task is not None:
+            try:
+                _, _translated_suggested = await asyncio.gather(verify_task, translate_suggestion_task)
                 if _translated_suggested:
                     _final_customer = _translated_suggested
             except Exception as tr_exc:
-                logger.warning("Failed to translate suggested response: %s", tr_exc)
+                logger.warning("Failed in concurrent translation tasks: %s", tr_exc)
+        else:
+            await verify_task
 
-        # Update exchange with translation + sentiment + intent
+        # Update exchange with translation + sentiment + intent in ONE single query (Change 7B)
         await db.execute(
             update(Exchange)
             .where(Exchange.id == exchange.id)
             .values(
-                customer_text_translated=llm_result.translation,
+                customer_text_translated=_hindi_translation,
                 staff_response_suggested=_final_hindi,
                 staff_response_translated=_final_customer,
                 sentiment=llm_result.sentiment,
@@ -519,63 +586,6 @@ async def run_transcription_pipeline(
         await db.commit()
         await db.refresh(exchange)
 
-        # Verify LLM translation. If the model echoes the customer's source
-        # language, force a dedicated source-language → Hindi translation before
-        # the staff panel sees the red "Hindi" block.
-        _hindi_translation = llm_result.translation
-        source_lang_code = (language_code or "hi").split("-")[0].lower()
-        if _needs_hindi_translation_retry(
-            original_text=customer_text_for_ai,
-            candidate_text=_hindi_translation,
-            source_language_code=source_lang_code,
-        ):
-            logger.warning(
-                "LLM translation still looks like source language (lang=%s) — forcing Hindi translate",
-                source_lang_code,
-            )
-            try:
-                _forced_hi = await ai_service.translate_text(
-                    text=customer_text_for_ai,
-                    target_language_code="hi",
-                    source_language_code=source_lang_code,
-                )
-                if _forced_hi and not _needs_hindi_translation_retry(
-                    original_text=customer_text_for_ai,
-                    candidate_text=_forced_hi,
-                    source_language_code=source_lang_code,
-                ):
-                    _hindi_translation = _forced_hi
-            except Exception as _tr_exc:
-                logger.warning("Forced Hindi translation failed (non-fatal): %s", _tr_exc)
-
-        if _needs_hindi_translation_retry(
-            original_text=customer_text_for_ai,
-            candidate_text=_hindi_translation,
-            source_language_code=source_lang_code,
-        ):
-            _fallback_hi = _fallback_source_to_hindi(
-                customer_text_for_ai,
-                source_lang_code,
-            )
-            if _fallback_hi:
-                _hindi_translation = _fallback_hi
-                logger.info(
-                    "Hindi translation corrected with local fallback | token=%s | text=%s",
-                    token_number, _hindi_translation[:60],
-                )
-
-        if _hindi_translation != llm_result.translation:
-            await db.execute(
-                update(Exchange)
-                .where(Exchange.id == exchange.id)
-                .values(customer_text_translated=_hindi_translation)
-            )
-            await db.commit()
-            logger.info(
-                "Hindi translation corrected | token=%s | text=%s",
-                token_number, _hindi_translation[:60],
-            )
-
         translation = _hindi_translation
 
         # Broadcast to staff panel
@@ -600,111 +610,25 @@ async def run_transcription_pipeline(
             exchange_id=exchange.id,
         )
 
-        # Broadcast info board update (after commit, so data is persisted)
-        if merged_info is not None:
-            # Deterministic Navigator: compute phase + next question
-            from services.session_navigator import compute_next_actions
-            from services.document_service import compute_readiness
-            _nav_intent = llm_result.intent or pre_intent
-            _doc_score = 0
-            try:
-                _rd = compute_readiness(_nav_intent, merged_info)
-                _doc_score = _rd.get("score", 0)
-            except Exception:
-                pass
-
-            nav_state = compute_next_actions(
-                intent=_nav_intent,
-                collected_info=merged_info,
-                doc_readiness_score=_doc_score,
-                conversation_stage=llm_result.conversation_stage or "exploring",
-                exchange_count=exchange_number,
-            )
-
-            # Use deterministic next_question instead of LLM's (never repeats)
-            det_next_hi = nav_state["next_question"]["question_hi"] if nav_state["next_question"] else None
-            det_next_label = nav_state["next_question"]["label"] if nav_state["next_question"] else None
-
-            await ws_manager.send_to_staff(
-                token_number,
-                "info_board_update",
-                {
-                    "collected_info": merged_info,
-                    "completion_percent": completion_pct,
-                    "next_question_hindi": det_next_hi or llm_result.next_question_hindi,
-                    "next_question_customer_lang": llm_result.next_question_customer_lang,
-                    "auto_step_completed": llm_result.auto_step_completed,
-                    "exchange_number": exchange_number,
-                    "conversation_stage": llm_result.conversation_stage,
-                    "intent": _nav_intent,  # ← FIX: was missing; InfoTab needs this to pick correct INTENT_SCHEMA
-                },
-            )
-
-            # Navigator state → staff panel
-            await ws_manager.send_to_staff(
-                token_number,
-                "navigator_update",
-                nav_state,
-            )
-
-            # AUTO TRIGGER: All info + docs collected → send customer notification
-            # Fires once per session (Redis guard inside broadcast_all_info_collected)
-            _all_complete = nav_state.get("all_complete", False)
-            _doc_ready = _doc_score >= 80  # 80% docs = enough to start verification
-            if _all_complete and _doc_ready:
-                _lang = language_code or "hi"
-                _nav_intent = llm_result.intent or pre_intent
-                try:
-                    await ws_manager.broadcast_all_info_collected(
-                        token_number=token_number,
-                        lang_code=_lang,
-                        intent=_nav_intent,
-                        session_id=session_id,
-                    )
-                    logger.info(
-                        "Auto all_info_collected triggered | token=%s | intent=%s | doc_score=%d%%",
-                        token_number, _nav_intent, _doc_score,
-                    )
-                except Exception as _aic_exc:
-                    logger.warning(
-                        "broadcast_all_info_collected failed (non-fatal) | token=%s | %s",
-                        token_number, _aic_exc,
-                    )
-
-            # DRV Trigger B: Update doc readiness after each info_board_update
-            _drv_intent = llm_result.intent or pre_intent
-            if _drv_intent and _drv_intent.upper() not in ("GENERAL", ""):
-                from services.document_service import build_checklist, compute_readiness
-                try:
-                    _readiness = compute_readiness(_drv_intent, merged_info)
-                    await ws_manager.broadcast_doc_readiness(token_number, _readiness)
-                    _checklist = build_checklist(_drv_intent, language_code, merged_info)
-                    if _checklist:
-                        await ws_manager.broadcast_document_checklist(
-                            token_number, _drv_intent, _checklist, language_code,
-                        )
-                except Exception as drv_exc:
-                    logger.debug("DRV trigger B failed (non-fatal): %s", drv_exc)
-
-        # Auto-step completion
-        if llm_result.auto_step_completed:
-            await _handle_auto_step_completion(
-                db=db,
-                session_id=session_id,
+        # Fire post-LLM broadcasts as a fire-and-forget task
+        # These are non-critical UI updates (info_board, navigator, doc_readiness,
+        # process_update) that should NOT block the main pipeline response.
+        asyncio.create_task(
+            _fire_post_llm_broadcasts(
+                merged_info=merged_info,
+                completion_pct=completion_pct if merged_info is not None else 0,
+                llm_result=llm_result,
+                pre_intent=pre_intent,
+                exchange_number=exchange_number,
                 token_number=token_number,
-                intent=llm_result.intent or "general",
-                auto_label=llm_result.auto_step_completed,
-                source_label=source_label,
-            )
-
-        # Intent Engine PROCESS_UPDATE
-        if llm_result.intent and llm_result.intent.upper() not in ("GENERAL", ""):
-            await _broadcast_intent_engine_update(
-                stt_text=stt_result.text,
                 language_code=language_code,
-                token_number=token_number,
+                session_id=session_id,
+                stt_text=stt_result.text,
                 source_label=source_label,
+                db=db,
+                prev_collected=prev_collected,
             )
+        )
 
         # PII alert
         if stt_result.pii_detected:
@@ -1114,46 +1038,149 @@ async def _handle_auto_step_completion(
         logger.warning("Auto-step completion failed (non-fatal): %s", err)
 
 
-async def _broadcast_intent_engine_update(
+async def _fire_post_llm_broadcasts(
     *,
-    stt_text: str,
-    language_code: str,
+    merged_info,
+    completion_pct: int,
+    llm_result,
+    pre_intent: str,
+    exchange_number: int,
     token_number: str,
+    language_code: str,
+    session_id: int,
+    stt_text: str,
     source_label: str,
+    db,
+    prev_collected: dict,
 ) -> None:
-    """Call the intent_engine and broadcast process_update to staff."""
+    """
+    Fire all post-LLM broadcasts as a background task.
+    These are non-critical UI updates — failures are logged but don't block the pipeline.
+    """
     try:
-        from intent_engine import detect_intent
+        if merged_info is not None:
+            from services.session_navigator import compute_next_actions
+            from services.document_service import compute_readiness, build_checklist
+            _nav_intent = llm_result.intent or pre_intent
+            _doc_score = 0
+            try:
+                _rd = compute_readiness(_nav_intent, merged_info)
+                _doc_score = _rd.get("score", 0)
+            except Exception:
+                pass
 
-        ir = await detect_intent(
-            text=stt_text,
-            language_code=language_code,
-            groq_api_key=settings.GROQ_API_KEY,
-            groq_model=settings.GROQ_MODEL,
-        )
+            nav_state = compute_next_actions(
+                intent=_nav_intent,
+                collected_info=merged_info,
+                doc_readiness_score=_doc_score,
+                conversation_stage=llm_result.conversation_stage or "exploring",
+                exchange_count=exchange_number,
+            )
 
-        # Build key_entities dict (handle optional cibil_score attribute)
-        key_entities = {
-            "amount": ir.key_entities.amount,
-            "tenure": ir.key_entities.tenure,
-            "applicant_age": ir.key_entities.applicant_age,
-            "income": ir.key_entities.income,
-            "purpose": ir.key_entities.purpose,
-        }
-        if hasattr(ir.key_entities, "cibil_score"):
-            key_entities["cibil_score"] = ir.key_entities.cibil_score
+            det_next_hi = nav_state["next_question"]["question_hi"] if nav_state["next_question"] else None
+
+            await ws_manager.send_to_staff(
+                token_number,
+                "info_board_update",
+                {
+                    "collected_info": merged_info,
+                    "completion_percent": completion_pct,
+                    "next_question_hindi": det_next_hi or llm_result.next_question_hindi,
+                    "next_question_customer_lang": llm_result.next_question_customer_lang,
+                    "auto_step_completed": llm_result.auto_step_completed,
+                    "exchange_number": exchange_number,
+                    "conversation_stage": llm_result.conversation_stage,
+                    "intent": _nav_intent,
+                },
+            )
+
+            await ws_manager.send_to_staff(token_number, "navigator_update", nav_state)
+
+            # AUTO TRIGGER: All info + docs collected
+            _all_complete = nav_state.get("all_complete", False)
+            _doc_ready = _doc_score >= 80
+            if _all_complete and _doc_ready:
+                try:
+                    await ws_manager.broadcast_all_info_collected(
+                        token_number=token_number,
+                        lang_code=language_code or "hi",
+                        intent=_nav_intent,
+                        session_id=session_id,
+                    )
+                except Exception as _aic_exc:
+                    logger.warning("broadcast_all_info_collected failed: %s", _aic_exc)
+
+            # DRV Trigger B: doc readiness + checklist
+            if _nav_intent and _nav_intent.upper() not in ("GENERAL", ""):
+                try:
+                    _readiness = compute_readiness(_nav_intent, merged_info)
+                    await ws_manager.broadcast_doc_readiness(token_number, _readiness)
+                    _checklist = build_checklist(_nav_intent, language_code, merged_info)
+                    if _checklist:
+                        await ws_manager.broadcast_document_checklist(
+                            token_number, _nav_intent, _checklist, language_code,
+                        )
+                except Exception as drv_exc:
+                    logger.debug("DRV trigger B failed: %s", drv_exc)
+
+        # Auto-step completion
+        if llm_result.auto_step_completed:
+            await _handle_auto_step_completion(
+                db=db,
+                session_id=session_id,
+                token_number=token_number,
+                intent=llm_result.intent or "general",
+                auto_label=llm_result.auto_step_completed,
+                source_label=source_label,
+            )
+
+        # Intent Engine PROCESS_UPDATE — lightweight, NO extra LLM call.
+        # Reuses the intent already detected by the main LLM pipeline
+        # and loads process data from local JSON files via process_loader.
+        if llm_result.intent and llm_result.intent.upper() not in ("GENERAL", ""):
+            await _broadcast_process_update_from_llm(
+                token_number=token_number,
+                intent=llm_result.intent,
+                language_code=language_code,
+            )
+
+        # PII alert (moved from main pipeline for consistency)
+
+    except Exception as exc:
+        logger.warning("Post-LLM broadcasts failed (non-fatal): %s", exc)
+
+
+async def _broadcast_process_update_from_llm(
+    *,
+    token_number: str,
+    intent: str,
+    language_code: str,
+) -> None:
+    """
+    Broadcast PROCESS_UPDATE to staff using local process_loader data.
+    NO LLM call — saves 1-3s vs the old _broadcast_intent_engine_update.
+    """
+    try:
+        from language_config import normalise_intent, get_tts_voice
+        from process_loader import load_process, get_process_steps, get_key_info
+
+        normalised = normalise_intent(intent)
+        process_data = load_process(normalised)
+        key_info = get_key_info(normalised)
+        product_name = process_data.get("product_name", "Union Bank of India")
+        tts_voice = get_tts_voice((language_code or "hi").split("-")[0].lower())
 
         await ws_manager.broadcast_process_update(
             token_number=token_number,
-            intent=ir.intent,
-            process_data=ir.process_data,
-            staff_message=ir.staff_message,
-            detected_language=ir.detected_language,
-            key_entities=key_entities,
-            key_info=ir.key_info,
-            product_name=ir.product_name,
-            tts_voice=ir.tts_voice,
-            confidence=ir.confidence,
+            intent=normalised,
+            process_data=process_data,
+            staff_message="",  # Not needed — staff already has LLM suggestion
+            detected_language=(language_code or "hi").split("-")[0].lower(),
+            key_entities={},
+            key_info=key_info,
+            product_name=product_name,
+            tts_voice=tts_voice,
+            confidence=0.9,
         )
     except Exception as err:
-        logger.warning("PROCESS_UPDATE (%s) failed (non-fatal): %s", source_label, err)
+        logger.warning("PROCESS_UPDATE (lightweight) failed (non-fatal): %s", err)

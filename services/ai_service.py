@@ -399,7 +399,7 @@ class AIService:
                     generation_config=genai.types.GenerationConfig(
                         response_mime_type="application/json",
                         temperature=0.3,
-                        max_output_tokens=1200,
+                        max_output_tokens=800,
                     ),
                 )
                 logger.info("Gemini backup LLM initialized: %s", settings.GEMINI_MODEL)
@@ -470,6 +470,7 @@ class AIService:
         language_code: str,
         session_id: Optional[int] = None,
         skip_pii: bool = False,
+        engine_override: Optional[Any] = None,
     ) -> TranscriptionResult:
         """
         Transcribe audio using the multi-engine fallback chain.
@@ -491,6 +492,7 @@ class AIService:
             language_code=language_code,
             session_id=session_id,
             skip_pii=skip_pii,
+            engine_override=engine_override,
         )
 
 
@@ -1214,14 +1216,36 @@ class AIService:
         # Match any character outside standard ASCII range (non-ASCII)
         return bool(re.search(r'[^\x00-\x7F]', text))
 
+    def _detect_indian_language(self, text: str) -> str:
+        if not text:
+            return "hi"
+        import re
+        ranges = {
+            "hi": r"[\u0900-\u097F]",  # Devanagari (Hindi/Marathi)
+            "bn": r"[\u0980-\u09FF]",  # Bengali
+            "pa": r"[\u0A00-\u0A7F]",  # Gurmukhi (Punjabi)
+            "gu": r"[\u0A80-\u0AFF]",  # Gujarati
+            "or": r"[\u0B00-\u0B7F]",  # Odia
+            "ta": r"[\u0B80-\u0BFF]",  # Tamil
+            "te": r"[\u0C00-\u0C7F]",  # Telugu
+            "kn": r"[\u0C80-\u0CFF]",  # Kannada
+            "ml": r"[\u0D00-\u0DFF]",  # Malayalam
+        }
+        for code, pattern in ranges.items():
+            if re.search(pattern, text):
+                return code
+        return "hi"
+
     async def translate_to_english(self, text: str) -> str:
         """
         Translate any Indian language text to English using a multi-engine fallback chain:
-        1. Predefined dictionary (with text normalization)
-        2. Groq LLaMA (llama-3.3-70b-versatile, fallback: llama-3.1-8b-instant)
-        3. Google Gemini (gemini-2.0-flash)
-        4. OpenRouter (google/gemini-2.0-flash:free)
-        5. Sarvam Translate (formal, mayura:v1)
+        0. Predefined dictionary (with text normalization)
+        0a. Argos Translate (local, offline)
+        0b. Google Translate Web API + MyMemory API (CONCURRENT — first wins)
+        1. Groq LLaMA (llama-3.3-70b-versatile, fallback: llama-3.1-8b-instant)
+        2. Google Gemini (gemini-2.0-flash)
+        3. OpenRouter (google/gemini-2.0-flash:free)
+        4. Sarvam Translate (formal, mayura:v1)
 
         Returns the translated text, or the original text on failure.
         """
@@ -1241,37 +1265,72 @@ class AIService:
             logger.info("Translation cache hit (predefined) for: %s", text[:40])
             return self._normalized_banking_translations[normalized_text]
 
+        # Check Redis translation cache
+        redis = None
+        cache_key = f"tr_en_cache:{hashlib.sha256(text.encode()).hexdigest()}"
+        try:
+            redis = await self._get_redis()
+            if redis is not None:
+                cached = await redis.get(cache_key)
+                if cached:
+                    logger.info("Translation cache hit (Redis) for: %s", text[:40])
+                    val = cached.decode("utf-8") if isinstance(cached, bytes) else str(cached)
+                    return val
+        except Exception as exc:
+            logger.warning("Redis translation cache read failed: %s", exc)
+
+        translated_res = None
+
+        # 0. Argos Translate (100% Local, Offline Open Source Engine - Tried First)
+        # Skip Argos if the input has only Latin chars (Hinglish/English) since Argos hi->en expects Devanagari/Indian scripts.
+        if self._has_indian_chars(text):
+            try:
+                import argostranslate.translate
+                src_lang = self._detect_indian_language(text)
+                translated = argostranslate.translate.translate(text, src_lang, "en")
+                if translated and translated.strip() != text.strip():
+                    translated_res = translated.strip()
+                    logger.info("Argos Translate success: %s", translated_res[:40])
+            except Exception as argos_exc:
+                logger.warning("Argos Translate failed (checking web fallbacks): %s", argos_exc)
+
+        # 0.1 + 0.5 Google Translate + MyMemory — CONCURRENT (first wins)
+        # Saves 3-10s vs sequential fallback when one engine is slow/down.
+        if not translated_res:
+            translated_res = await self._translate_free_engines_concurrent(text)
+
         # 1. Groq LLaMA
         try:
-            completion = await self._call_groq_with_fallback(
-                model=settings.GROQ_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a translator. Translate the given text to English. "
-                            "Return ONLY the English translation, nothing else. "
-                            "No explanations, no quotes, just the translated text."
-                        ),
-                    },
-                    {"role": "user", "content": text},
-                ],
-                temperature=0.1,
-                max_tokens=200,
-                timeout=15.0,
-            )
-            result = (completion.choices[0].message.content or "").strip()
-            if result:
-                # If result is identical to input and input has Indian chars, the model failed/echoed
-                if result.strip() != text.strip() or not self._has_indian_chars(text):
-                    return result
-                else:
-                    logger.warning("Groq translate returned identical text; trying next fallback.")
+            if not translated_res:
+                completion = await self._call_groq_with_fallback(
+                    model=settings.GROQ_MODEL,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a translator. Translate the given text to English. "
+                                "Return ONLY the English translation, nothing else. "
+                                "No explanations, no quotes, just the translated text."
+                            ),
+                        },
+                        {"role": "user", "content": text},
+                    ],
+                    temperature=0.1,
+                    max_tokens=200,
+                    timeout=8.0,
+                )
+                result = (completion.choices[0].message.content or "").strip()
+                if result:
+                    # If result is identical to input and input has Indian chars, the model failed/echoed
+                    if result.strip() != text.strip() or not self._has_indian_chars(text):
+                        translated_res = result
+                    else:
+                        logger.warning("Groq translate returned identical text; trying next fallback.")
         except Exception as exc:
             logger.warning("Groq translate_to_english failed: %s — trying Gemini fallback", exc)
 
         # 2. Gemini Fallback
-        if self._gemini_model is not None:
+        if not translated_res and self._gemini_model is not None:
             try:
                 gemini_prompt = (
                     "SYSTEM INSTRUCTIONS:\n"
@@ -1285,14 +1344,14 @@ class AIService:
                 result = (gemini_response.text or "").strip()
                 if result:
                     if result.strip() != text.strip() or not self._has_indian_chars(text):
-                        return result
+                        translated_res = result
                     else:
                         logger.warning("Gemini translate returned identical text; trying next fallback.")
             except Exception as gemini_exc:
                 logger.warning("Gemini translate_to_english fallback failed: %s — trying OpenRouter fallback", gemini_exc)
 
         # 3. OpenRouter Fallback
-        if settings.OPENROUTER_API_KEY:
+        if not translated_res and settings.OPENROUTER_API_KEY:
             try:
                 headers = {
                     "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
@@ -1319,7 +1378,7 @@ class AIService:
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=15.0
+                    timeout=8.0
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -1328,14 +1387,14 @@ class AIService:
                         result = (choices[0].get("message", {}).get("content", "")).strip()
                         if result:
                             if result.strip() != text.strip() or not self._has_indian_chars(text):
-                                return result
+                                translated_res = result
                             else:
                                 logger.warning("OpenRouter translate returned identical text; trying next fallback.")
             except Exception as or_exc:
                 logger.warning("OpenRouter translate_to_english fallback failed: %s — trying Sarvam Translate fallback", or_exc)
 
         # 4. Sarvam Translate Fallback (hi-IN -> en-IN)
-        if settings.SARVAM_API_KEY:
+        if not translated_res and settings.SARVAM_API_KEY:
             try:
                 resp = await self._http_client.post(
                     "https://api.sarvam.ai/translate",
@@ -1352,17 +1411,108 @@ class AIService:
                         "model": "mayura:v1",
                         "enable_preprocessing": True,
                     },
-                    timeout=15.0,
+                    timeout=8.0,
                 )
                 if resp.status_code == 200:
                     result = resp.json().get("translated_text", "").strip()
                     if result:
                         if result.strip() != text.strip() or not self._has_indian_chars(text):
-                            return result
+                            translated_res = result
             except Exception as sarvam_exc:
                 logger.warning("Sarvam translate_to_english fallback failed: %s", sarvam_exc)
 
+        # Cache successful translation in Redis
+        if translated_res and translated_res != text:
+            if redis is not None:
+                try:
+                    await redis.setex(cache_key, 7 * 24 * 3600, translated_res)
+                    logger.info("Translation cached to Redis for: %s", text[:40])
+                except Exception as exc:
+                    logger.warning("Redis translation cache write failed: %s", exc)
+            return translated_res
+
         return text  # final graceful fallback
+
+    async def _translate_free_engines_concurrent(self, text: str) -> str | None:
+        """
+        Run Google Translate Web API and MyMemory API concurrently.
+        Returns the first successful translation, cancelling the slower engine.
+        Saves 3-10s vs sequential fallback when one engine is slow/down.
+        """
+
+        async def _google_translate(t: str) -> str | None:
+            try:
+                url = "https://translate.googleapis.com/translate_a/single"
+                params = {"client": "gtx", "sl": "auto", "tl": "en", "dt": "t", "q": t}
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Referer": "https://translate.google.com/",
+                }
+                resp = await self._http_client.get(url, params=params, headers=headers, timeout=4.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data and len(data) > 0 and data[0] and len(data[0]) > 0:
+                        result = "".join([part[0] for part in data[0] if part and part[0]])
+                        if result and result.strip() != t.strip():
+                            logger.info("Google Translate Web API success: %s", result[:40])
+                            return result
+            except Exception as exc:
+                logger.debug("Google Translate concurrent failed: %s", exc)
+            return None
+
+        async def _mymemory_translate(t: str) -> str | None:
+            try:
+                src_lang = self._detect_indian_language(t)
+                url = "https://api.mymemory.translated.net/get"
+                params = {"q": t, "langpair": f"{src_lang}|en"}
+                resp = await self._http_client.get(url, params=params, timeout=4.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    translation = data.get("responseData", {}).get("translatedText")
+                    if translation and translation.strip() != t.strip() and "mymemory" not in translation.lower():
+                        logger.info("MyMemory Translate API success: %s", translation[:40])
+                        return translation.strip()
+            except Exception as exc:
+                logger.debug("MyMemory concurrent failed: %s", exc)
+            return None
+
+        # Fire both concurrently — first success wins
+        tasks = [
+            asyncio.create_task(_google_translate(text)),
+            asyncio.create_task(_mymemory_translate(text)),
+        ]
+        try:
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=5.0,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            # Check completed tasks for a result
+            for task in done:
+                try:
+                    result = task.result()
+                    if result:
+                        for p in pending:
+                            p.cancel()
+                        return result
+                except Exception:
+                    pass
+
+            # First completed returned None — wait briefly for the other
+            for task in pending:
+                try:
+                    result = await asyncio.wait_for(task, timeout=2.0)
+                    if result:
+                        return result
+                except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                    pass
+
+        except Exception as exc:
+            logger.warning("Concurrent free translation engines failed: %s", exc)
+            for task in tasks:
+                task.cancel()
+
+        return None
 
 
 # Module-level singleton

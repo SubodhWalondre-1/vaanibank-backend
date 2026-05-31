@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from database import redis_client
 
@@ -38,28 +39,47 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
 
 REDIS_SETTINGS_KEY = "system_settings"
 
+# In-memory TTL for settings cache (seconds).
+# Avoids 4+ Redis roundtrips per pipeline execution.
+_SETTINGS_CACHE_TTL: float = 30.0
+
 
 class SettingsService:
     """
     Manages runtime system settings.
     Saves to Redis (sub-millisecond lookups) and /backend/config/dynamic_settings.json (persistence).
+    Uses a process-level in-memory cache (30s TTL) to eliminate repeated Redis hits
+    within the same pipeline run.
     """
 
     def __init__(self) -> None:
         # Create config directory if not exists
         SETTINGS_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # In-memory cache to avoid Redis roundtrips on every call
+        self._mem_cache: Optional[Dict[str, Any]] = None
+        self._mem_cache_ts: float = 0.0
 
     async def get_all_settings(self) -> Dict[str, Any]:
         """
         Retrieve active settings.
-        Checks Redis first. If missed, reads from JSON file.
-        If file doesn't exist, returns DEFAULT_SETTINGS.
+        1. In-memory cache (zero-cost, 30s TTL)
+        2. Redis cache
+        3. JSON file fallback
+        4. DEFAULT_SETTINGS
         """
+        # 0. In-memory cache — eliminates 4+ Redis roundtrips per pipeline run
+        now = time.monotonic()
+        if self._mem_cache is not None and (now - self._mem_cache_ts) < _SETTINGS_CACHE_TTL:
+            return self._mem_cache
+
         # 1. Try Redis cache
         try:
             cached = await redis_client.get(REDIS_SETTINGS_KEY)
             if cached:
-                return json.loads(cached)
+                result = json.loads(cached)
+                self._mem_cache = result
+                self._mem_cache_ts = now
+                return result
         except Exception as exc:
             logger.warning("Redis settings read failed: %s", exc)
 
@@ -70,14 +90,19 @@ class SettingsService:
                     settings = json.load(f)
                 # Fill in any missing keys with defaults
                 merged = {**DEFAULT_SETTINGS, **settings}
-                # Warm up Redis cache
+                # Warm up Redis + in-memory cache
                 await self._cache_in_redis(merged)
+                self._mem_cache = merged
+                self._mem_cache_ts = time.monotonic()
                 return merged
             except Exception as exc:
                 logger.error("Failed to read settings from file: %s", exc)
 
         # 3. Return defaults
-        return DEFAULT_SETTINGS.copy()
+        defaults = DEFAULT_SETTINGS.copy()
+        self._mem_cache = defaults
+        self._mem_cache_ts = time.monotonic()
+        return defaults
 
     async def update_settings(self, new_settings: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -106,8 +131,10 @@ class SettingsService:
         except Exception as exc:
             logger.error("Failed to write dynamic settings to file: %s", exc)
 
-        # Save to Redis
+        # Save to Redis + invalidate in-memory cache
         await self._cache_in_redis(current)
+        self._mem_cache = current
+        self._mem_cache_ts = time.monotonic()
 
         return current
 

@@ -110,7 +110,7 @@ class AudioStreamSession:
         16-bit 16kHz mono WAV file in memory.
 
         Float32 range is [-1.0, 1.0].  We clamp and convert to int16 (s16le).
-        Pure Python — no ffmpeg, no temp files.
+        Pure Python fallback if NumPy is unavailable.
         """
         if not self.chunks:
             return b""
@@ -119,17 +119,20 @@ class AudioStreamSession:
         raw = b"".join(self.chunks)
         n_floats = len(raw) // 4   # each Float32 is 4 bytes
 
-        # Unpack Float32 samples
-        floats = struct.unpack(f"<{n_floats}f", raw[: n_floats * 4])
-
-        # Convert Float32 → int16 (with clamping)
-        int16_samples = [
-            max(-32768, min(32767, int(s * 32767)))
-            for s in floats
-        ]
-
-        # Pack as little-endian int16
-        int16_bytes = struct.pack(f"<{len(int16_samples)}h", *int16_samples)
+        # NumPy path — 10-50x faster than list comprehension
+        try:
+            import numpy as np
+            floats = np.frombuffer(raw[:n_floats * 4], dtype=np.float32)
+            int16_samples = np.clip(floats * 32767, -32768, 32767).astype(np.int16)
+            int16_bytes = int16_samples.tobytes()
+        except ImportError:
+            # Fallback: pure Python (original logic)
+            floats = struct.unpack(f"<{n_floats}f", raw[: n_floats * 4])
+            int16_samples = [
+                max(-32768, min(32767, int(s * 32767)))
+                for s in floats
+            ]
+            int16_bytes = struct.pack(f"<{len(int16_samples)}h", *int16_samples)
 
         # Write WAV container in memory
         buf = io.BytesIO()
@@ -164,9 +167,15 @@ def float32_bytes_to_wav(
     if n_floats == 0:
         return b""
 
-    floats = struct.unpack(f"<{n_floats}f", raw_bytes[: n_floats * 4])
-    int16_samples = [max(-32768, min(32767, int(s * 32767))) for s in floats]
-    int16_bytes = struct.pack(f"<{len(int16_samples)}h", *int16_samples)
+    try:
+        import numpy as np
+        floats = np.frombuffer(raw_bytes[:n_floats * 4], dtype=np.float32)
+        int16_samples = np.clip(floats * 32767, -32768, 32767).astype(np.int16)
+        int16_bytes = int16_samples.tobytes()
+    except ImportError:
+        floats = struct.unpack(f"<{n_floats}f", raw_bytes[: n_floats * 4])
+        int16_samples = [max(-32768, min(32767, int(s * 32767))) for s in floats]
+        int16_bytes = struct.pack(f"<{len(int16_samples)}h", *int16_samples)
 
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:

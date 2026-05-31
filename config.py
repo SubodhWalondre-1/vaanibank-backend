@@ -115,7 +115,7 @@ class Settings(BaseSettings):
         description="Groq model identifier",
     )
     GROQ_MAX_TOKENS: int = Field(
-        default=1000,
+        default=800,
         ge=100,
         le=8192,
         description="Maximum tokens for LLM completion",

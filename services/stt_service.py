@@ -55,7 +55,7 @@ logger = logging.getLogger("vaanibank.stt")
 CONFIDENCE_THRESHOLD: float = 0.6
 """Minimum confidence score to accept a transcription from an STT engine."""
 
-HTTP_TIMEOUT_SECONDS: float = 30.0
+HTTP_TIMEOUT_SECONDS: float = 5.0
 """Maximum time to wait for any single STT HTTP request."""
 
 FFMPEG_TIMEOUT_SECONDS: float = 15.0
@@ -360,8 +360,8 @@ async def transcribe_with_groq_whisper(
     """
     Call Groq Whisper Large-v3-Turbo STT API.
 
-    Uses a synchronous Groq client wrapped in asyncio.to_thread
-    because the Groq SDK audio API requires file-like objects.
+    Uses an in-memory BytesIO buffer (no temp files) wrapped in
+    asyncio.to_thread so the event loop is not blocked.
 
     Args:
         audio_bytes:      WAV audio bytes.
@@ -374,52 +374,38 @@ async def transcribe_with_groq_whisper(
     Raises:
         STTError: If the API returns empty or fails.
     """
-    import aiofiles
-
-    temp_fd, temp_path = await asyncio.to_thread(
-        tempfile.mkstemp, suffix=".wav"
+    transcript = await asyncio.to_thread(
+        _groq_whisper_sync_call,
+        audio_bytes,
+        language_code,
+        groq_sync_client,
     )
-    await asyncio.to_thread(os.close, temp_fd)
 
-    try:
-        async with aiofiles.open(temp_path, "wb") as temp_file:
-            await temp_file.write(audio_bytes)
-
-        transcript = await asyncio.to_thread(
-            _groq_whisper_sync_call,
-            temp_path,
-            language_code,
-            groq_sync_client,
+    text = transcript.strip()
+    if not text:
+        raise STTError(
+            message="Groq Whisper returned empty transcript.",
+            model_attempted=STTEngine.GROQ_WHISPER.value,
         )
 
-        text = transcript.strip()
-        if not text:
-            raise STTError(
-                message="Groq Whisper returned empty transcript.",
-                model_attempted=STTEngine.GROQ_WHISPER.value,
-            )
-
-        # Whisper does not return a confidence score; use a fixed value
-        return text, 0.90, STTEngine.GROQ_WHISPER.value
-
-    finally:
-        try:
-            await asyncio.to_thread(os.unlink, temp_path)
-        except OSError:
-            pass
+    # Whisper does not return a confidence score; use a fixed value
+    return text, 0.90, STTEngine.GROQ_WHISPER.value
 
 
 def _groq_whisper_sync_call(
-    audio_path: str,
+    audio_bytes: bytes,
     language_code: str,
     groq_sync_client: Any = None,
 ) -> str:
     """
     Synchronous Groq Whisper transcription call.
 
+    Uses in-memory BytesIO instead of temp files to avoid disk I/O overhead.
     Designed to run inside asyncio.to_thread so the event loop
-    is not blocked by file I/O or the Groq SDK.
+    is not blocked by the Groq SDK.
     """
+    import io
+
     if groq_sync_client is None:
         from groq import Groq
         groq_sync_client = Groq(api_key=settings.GROQ_API_KEY)
@@ -428,13 +414,15 @@ def _groq_whisper_sync_call(
     # Odia: Whisper uses ISO 639-3 "ori" instead of ISO 639-1 "or"
     whisper_language = short_code if short_code != "or" else "ori"
 
-    with open(audio_path, "rb") as audio_file:
-        transcription = groq_sync_client.audio.transcriptions.create(
-            file=("audio.wav", audio_file),
-            model="whisper-large-v3-turbo",
-            language=whisper_language,
-            response_format="text",
-        )
+    audio_file = io.BytesIO(audio_bytes)
+    audio_file.name = "audio.wav"
+
+    transcription = groq_sync_client.audio.transcriptions.create(
+        file=("audio.wav", audio_file),
+        model="whisper-large-v3-turbo",
+        language=whisper_language,
+        response_format="text",
+    )
 
     return str(transcription).strip()
 
@@ -533,6 +521,7 @@ class STTService:
         language_code: str,
         session_id: Optional[int] = None,
         skip_pii: bool = False,
+        engine_override: Optional[STTEngine] = None,
     ) -> TranscriptionResult:
         """
         Transcribe audio using the configured fallback chain.
@@ -549,6 +538,7 @@ class STTService:
             language_code: ISO 639-1 code (e.g. "mr", "ta", "hi").
             session_id:    Optional session ID for logging context.
             skip_pii:      Skip PII masking (used for streaming partials).
+            engine_override: Optional STTEngine to bypass the configured chain.
 
         Returns:
             TranscriptionResult with text, confidence, metrics.
@@ -565,7 +555,10 @@ class STTService:
         wav_bytes = await convert_to_wav(audio_bytes)
 
         # Step 3: Build and execute fallback chain
-        engine_chain = await self._build_engine_chain()
+        if engine_override:
+            engine_chain = [engine_override]
+        else:
+            engine_chain = await self._build_engine_chain()
         text, confidence, model_used, attempts = await self._execute_fallback_chain(
             engine_chain=engine_chain,
             audio_bytes=wav_bytes,

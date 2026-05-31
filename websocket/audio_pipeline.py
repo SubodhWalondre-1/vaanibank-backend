@@ -110,11 +110,13 @@ class AudioPipelineMixin:
                 return
 
             from services.ai_service import ai_service
+            from services.stt_service import STTEngine
             result = await ai_service.transcribe(
                 audio_bytes=wav_bytes,
                 language_code=session.lang_code,
                 session_id=session.session_id,
                 skip_pii=True,  # partials don't need PII masking — speed matters
+                engine_override=STTEngine.GROQ_WHISPER,
             )
 
             partial_text = result.text.strip()

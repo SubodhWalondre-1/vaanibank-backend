@@ -93,7 +93,7 @@ _COLLECTION_NAME = "vaanibank_kb_v2"
 _DENSE_CANDIDATES = 15    # how many dense results to fetch before reranking
 _BM25_CANDIDATES  = 15    # how many BM25 results to fetch before reranking
 _RRF_K            = 60    # RRF constant (standard value, do not change lightly)
-_FINAL_TOP_K      = 4     # number of chunks returned to the LLM after reranking
+_FINAL_TOP_K      = 2     # number of chunks returned to the LLM after reranking
 
 # Minimum confidence threshold — chunks below this score are dropped
 _MIN_SCORE_THRESHOLD = 0.10
@@ -327,8 +327,15 @@ class RAGService:
         """
         # Skip rewriting if query is already standalone
         word_count = len(current_query.strip().split())
-        if word_count >= 6 or len(conversation_history) < 2:
+        if word_count >= 4 or len(conversation_history) < 3:
             return current_query
+
+        # Skip if query already contains direct intent keywords (Change 1B)
+        from services.llm_utils import _INTENT_KEYWORDS
+        lower_query = current_query.lower()
+        for keywords in _INTENT_KEYWORDS.values():
+            if any(kw in lower_query for kw in keywords):
+                return current_query
 
         try:
             from services.ai_service import ai_service
