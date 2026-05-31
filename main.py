@@ -128,10 +128,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Auto-seed missing demo staff accounts
     try:
-        from passlib.context import CryptContext
+        from core.security import hash_password as _seed_hash
         from sqlalchemy import select as sa_select
         from models import StaffMember, Branch
-        pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
         DEMO_STAFF = [
             {"staff_id": "UBI-NGP-001", "username": "demo",    "password_plain": "demo123",    "full_name": "Rajesh Kumar",  "role": "teller",     "branch_code": "NGP-CVL-01", "languages_known": ["Hindi", "Marathi"]},
             {"staff_id": "UBI-NGP-002", "username": "manager", "password_plain": "manager123", "full_name": "Priya Sharma",  "role": "manager",    "branch_code": "NGP-CVL-01", "languages_known": ["Hindi", "English"]},
@@ -152,13 +151,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
                 # Safely extract, convert, and truncate the password
                 raw_pw = sdata.get("password_plain")
-                plain_password = str(raw_pw if raw_pw is not None else "admin123")[:72]
+                plain_password = str(raw_pw if raw_pw is not None else "admin123")
 
                 if existing:
                     # Update fields dynamically in case they changed in settings
                     existing.staff_id = sdata["staff_id"]
                     existing.username = sdata["username"]
-                    existing.password_hash = pwd_ctx.hash(plain_password)
+                    existing.password_hash = _seed_hash(plain_password)
                     existing.full_name = sdata["full_name"]
                     existing.languages_known = sdata["languages_known"]
                     continue
@@ -171,7 +170,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 staff = StaffMember(
                     staff_id=sdata["staff_id"],
                     username=sdata["username"],
-                    password_hash=pwd_ctx.hash(plain_password),
+                    password_hash=_seed_hash(plain_password),
                     full_name=sdata["full_name"],
                     role=sdata["role"],
                     branch_id=branch.id,
