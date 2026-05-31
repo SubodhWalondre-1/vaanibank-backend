@@ -2,54 +2,65 @@
 intent: kyc_update
 product: kyc
 doc_type: sop
-language: hi
+language: en
 risk_level: medium
 version: "2026-05"
 ---
 
 # KYC Update and Re-verification — Union Bank of India
 
-## When KYC Update is Required
-- Customer changes address
-- Customer changes mobile number linked to account
-- Aadhaar not seeded with account (DBT/government subsidy will not reach without seeding)
-- Periodic re-KYC: every 2 years for high-risk customers; every 8-10 years for low-risk customers
-- Customer name change (after marriage or legal order)
-- PAN not linked to account
+## 1. How to Seed Aadhaar with a Bank Account
 
-## Aadhaar Seeding Process
-Step 1: Customer provides Aadhaar number
-Step 2: Staff enters Aadhaar in CBS → system sends OTP to Aadhaar-linked mobile
-Step 3: Customer provides OTP → Aadhaar seeded within 24 hours
-Step 4: If mobile not linked to Aadhaar, physical verification required: original Aadhaar + self-attested copy
+### Method A: Online (Via Bank Portal/App)
+1. Visit the **Union Bank of India** official website or log in to the **Union Ease** app.
+2. Navigate to the **Other Services** or **Requests** tab.
+3. Select the **Link Aadhaar with your account** option.
+4. Enter your 15-digit Union Bank account number.
+5. Enter your Aadhaar number twice for confirmation.
+6. Submit the request. Seeding will be completed upon successful verification with UIDAI.
 
-## Address Change Process
-Step 1: Customer submits address proof (Aadhaar with new address preferred)
-Step 2: Acceptable address proofs: Aadhaar, voter ID, driving licence, utility bill (not older than 3 months), rent agreement with notary
-Step 3: Staff updates address in CBS → system sends confirmation to registered mobile
-Step 4: New cheque book or passbook can be issued at new address after update
+### Method B: Offline (Via Home Branch)
+1. Visit the Union Bank of India home branch where the account is held.
+2. Request an **Aadhaar Linking/Seeding Form** from the staff.
+3. Fill out the form completely with your account details.
+4. Attach a self-attested photocopy of your Aadhaar card.
+5. Submit the form to the bank representative (carry the original card for verification).
 
-## Mobile Number Update Process
-Step 1: Customer submits written request with account number and signature
-Step 2: Identity proof: Aadhaar or PAN
-Step 3: Staff updates in CBS; OTP sent to new mobile for verification
-Step 4: Old mobile receives deactivation message
+---
 
-## Re-KYC Process (Periodic)
-Step 1: Identify re-KYC due date from CBS (branch manager report)
-Step 2: Inform customer by SMS/email 3 months before due date
-Step 3: Customer visits branch with fresh KYC documents
-Step 4: For Aadhaar-linked accounts: eKYC via OTP is sufficient (no physical documents)
-Step 5: Update CBS; confirm to customer
+## 2. How to Reactivate an Inoperative/Dormant Savings Account
+When a savings account sees no customer-induced transactions for over two years, it becomes dormant. To reactivate it:
+1. **Visit the Home Branch:** The account holder must physically visit their home branch.
+2. **Submit an Application:** Fill out an account reactivation form or submit a formal written letter requesting reactivation of the dormant account.
+3. **Provide Fresh KYC:** Submit a self-attested copy of valid KYC documents (typically a PAN card and proof of address/identity). Ensure you carry the originals for branch verification.
+4. **Conduct a Transaction:** Perform a customer-induced financial transaction over the counter, such as a small cash deposit or withdrawal.
+5. **Processing Time & Charges:** The bank will process the request **free of charge**, and the account usually becomes fully operational within 24 to 48 hours.
 
-## Required Documents Summary
-- Address change: new address proof (Aadhaar preferred)
-- Name change: gazette notification + new Aadhaar/PAN with updated name
-- Mobile number change: identity proof + written request
-- Re-KYC: Aadhaar + PAN (original + copy)
+---
 
-## Key Rules
-- Accounts with KYC overdue beyond 6 months: transactions restricted by RBI guideline
-- Aadhaar seeding mandatory for PMJDY accounts and DBT subsidy beneficiaries
-- Staff must not accept photocopies without originals for first-time KYC
-- eKYC via Aadhaar OTP is legally valid and equivalent to physical KYC (UIDAI notification)
+## 3. How to Register or Reset tPIN on the Union Ease App
+The Transaction PIN (tPIN) is required to authorize money transfers and service requests within the **Union Ease** app.
+
+### Step-by-Step Reset/Registration Process:
+1. Open the **Union Ease** mobile app.
+2. Go to the Settings menu or look for the **Forgot tPIN / Reset tPIN** option (often accessible directly from the login screen or the security center).
+3. The app will prompt you to validate your identity. Choose your preferred validation method:
+   * **Debit Card:** Enter your debit card number, expiry date, and your ATM PIN.
+   * **Internet Banking:** Enter your Net Banking User ID and Login Password.
+   * **Branch Token:** Enter a token generated by visiting a bank branch.
+4. Once your credentials are authenticated, the bank will send a One-Time Password (OTP) to your registered mobile number.
+5. Enter the OTP to verify your device.
+6. You will be prompted to create a new 4-digit tPIN. Enter it once, then confirm it a second time.
+7. Submit to finalize the reset. Your new tPIN is now active for transactions.
+
+---
+
+## 4. Re-KYC Process (Periodic)
+* **High Risk:** At least once every 2 years.
+* **Medium Risk:** At least once every 8 years.
+* **Low Risk:** At least once every 10 years.
+* **SOP:**
+  1. Identify re-KYC due date from CBS.
+  2. Inform customer by SMS/email 3 months before due date.
+  3. Customer visits branch or updates via digital channels (like V-CIP or the mobile app).
+  4. For Aadhaar-linked accounts: eKYC via OTP is sufficient (no physical documents needed).

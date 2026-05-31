@@ -2,58 +2,53 @@
 intent: general
 product: all
 doc_type: compliance
-language: hi
+language: en
 risk_level: high
 version: "2026-05"
 ---
 
-# RBI Compliance Rules — Union Bank of India Branch Operations
+# RBI Compliance & Regulatory Rules — Union Bank of India
 
-## PAN Card Rules (RBI Circular)
-- PAN mandatory for all cash transactions above Rs. 50,000 (single transaction or aggregated in a day)
-- PAN mandatory for all loan applications regardless of amount
-- PAN mandatory for FD opening if expected interest exceeds Rs. 40,000 per year
-- If customer does not have PAN: Form 60 must be filled (Declaration of not having PAN)
-- Form 60 is NOT acceptable for loan applications — PAN is compulsory for loans
+## 1. PAN Card Mandate (Rule 114B)
+Under the Income Tax Rules, quoting a Permanent Account Number (PAN) or submitting Form 60 (if the customer does not have a PAN) is mandatory for the following banking transactions:
 
-## CIBIL Score Guidelines (Union Bank Policy)
-- Home Loan above 30 lakh: minimum CIBIL 720
-- Home Loan below 30 lakh: minimum CIBIL 700
-- Personal Loan: minimum CIBIL 700
-- Education Loan: minimum CIBIL 650 (student + co-applicant parent)
-- Vehicle Loan: minimum CIBIL 680
-- Gold Loan: CIBIL not required (secured against gold)
-- Mudra Loan: CIBIL checked but not strict cutoff; business viability primary criterion
-- CIBIL score below cutoff: staff must inform customer politely and advise improvement steps (reduce utilisation, clear dues)
+| Transaction Type | Mandatory PAN / Form 60 Threshold |
+| :--- | :--- |
+| **Cash Deposits** | Exceeding ₹50,000 in a single day across any account. |
+| **Cash Withdrawals** | Exceeding ₹50,000 in a single day. |
+| **Time Deposits (FDs/RDs)** | Exceeding ₹50,000 per transaction, or aggregating to more than ₹5 Lakh in a financial year. |
+| **Demand Drafts (DD) / Pay Orders** | Purchasing DDs or Pay Orders in cash for an amount exceeding ₹50,000 in a single day. |
+| **Pre-paid Instruments** | Cash payments exceeding ₹50,000 in a single day for the purchase of bank drafts, pay orders, or banker's cheques. |
+| **Account Opening** | Opening any bank account (other than a BSBD-Small Account) or applying for a credit or debit card. |
 
-## KYC Compliance (RBI Master Direction 2016, updated 2023)
-- KYC mandatory before opening any account
-- Re-KYC due: high-risk customers every 2 years; medium-risk every 8 years; low-risk every 10 years
-- Accounts with overdue re-KYC: partial freeze after 3 months notice; full freeze after 6 months
-- Aadhaar-based eKYC is legally valid for all account types
+* **Compliance Note (2026):** Under upcoming regulatory shifts, monitoring is also transitioning toward annual thresholds (e.g., aggregating cash deposits/withdrawals exceeding ₹10 Lakh in a financial year). However, the per-day ₹50,000 counter rule remains the immediate trigger for teller operations.
 
-## Minimum Balance Non-Compliance (RBI Guideline)
-- Bank must inform customer before levying non-maintenance charges
-- Non-maintenance charge cannot exceed: Rs. 100 per month for urban; Rs. 50 for rural
-- BSBD and PMJDY accounts: zero charges — no minimum balance penalty ever
+---
 
-## Cash Transaction Reporting (CTR)
-- All cash transactions above Rs. 10 lakh in a day must be reported to FIU-IND
-- Suspicious transactions must be flagged as STR regardless of amount
-- Staff must not tip off the customer about STR filing (PMLA Act)
+## 2. BSBDA - Small Account Limits
+Basic Savings Bank Deposit Accounts (BSBDA) opened under simplified KYC norms (often referred to as Small Accounts or Jan Dhan accounts without full KYC) are subject to strict regulatory caps to mitigate anti-money laundering (AML) risks.
 
-## Loan-to-Value (LTV) Ratios (RBI Guideline)
-- Home Loan: maximum 80% of property value (above Rs. 75 lakh); 90% for below Rs. 30 lakh
-- Gold Loan: maximum 75% of gold value
-- Vehicle Loan: maximum 85% of on-road vehicle price
+Staff must monitor these accounts for the following limits:
+* **Maximum Balance:** The total balance in the account must never exceed **₹50,000** at any point in time.
+* **Annual Credit Limit:** The aggregate of all credits (deposits, inward transfers, subsidies) in a financial year must not exceed **₹1 Lakh**.
+* **Monthly Withdrawal Limit:** The aggregate of all withdrawals and transfers in a month must not exceed **₹10,000**.
+* **Transaction Cap:** A maximum of **four withdrawals** are allowed per calendar month (this includes ATM withdrawals, RTGS/NEFT/IMPS transfers, clearing, and branch cash withdrawals).
 
-## Interest Rate Transparency
-- All floating rate loans linked to external benchmark (RBI Repo Rate)
-- Staff must inform customer of spread charged over benchmark
-- No hidden charges — all charges must be disclosed in sanction letter
+> [!IMPORTANT]
+> If a customer exceeds the ₹50,000 balance or ₹1 Lakh annual credit limit, a system freeze will be initiated, and no further credits will be allowed until the customer submits full KYC documents to convert the account into a regular savings or fully-KYC BSBDA account.
 
-## Grievance Redressal
-- Branch must resolve complaint within 30 days
-- If unresolved: customer can approach RBI Banking Ombudsman
-- Ombudsman portal: https://bankingombudsman.rbi.org.in
-- Toll-free: 14448
+---
+
+## 3. Re-KYC (Periodic Updation) Guidelines
+To comply with the RBI Master Direction on KYC, banks must conduct a periodic review and updation of customer identification documents. The frequency of Re-KYC is strictly determined by the customer's risk profile:
+
+* **High Risk (Re-KYC at least once every 2 years):**
+  * *Profile Examples (Indicative):* Politically Exposed Persons (PEPs), NGOs, non-face-to-face customers, accounts with suspicious transaction histories, and complex corporate structures.
+* **Medium Risk (Re-KYC at least once every 8 years):**
+  * *Profile Examples:* NBFCs, stockbrokers, high-net-worth individuals (HNIs), and customers with significant but standard business turnovers.
+* **Low Risk (Re-KYC at least once every 10 years):**
+  * *Profile Examples:* Salaried employees, pensioners, government departments, and standard retail customers with regular, predictable account activity.
+
+### Operational Directives for Staff:
+* **Advance Notice:** The bank is required to intimate customers in advance of their due date for periodic updation. Staff should guide customers to update via digital channels (like V-CIP or the mobile app) where possible.
+* **Low-Risk Flexibility:** If a low-risk customer’s KYC is due, banks can allow normal transactions to continue temporarily while providing a grace period (as per internal bank policy and recent RBI circulars) before instituting partial freezes.
