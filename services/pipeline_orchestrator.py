@@ -425,14 +425,64 @@ async def run_transcription_pipeline(
             prev_collected,
         )
 
+        _final_hindi = llm_result.suggested_response_hindi
+        _final_customer = llm_result.suggested_response_customer_lang
+        _final_intent = llm_result.intent or pre_intent
+
+        if _final_intent and _final_intent.upper() not in ("GENERAL", ""):
+            try:
+                _rd = compute_readiness(_final_intent, prev_collected)
+                _doc_score = _rd.get("score", 0)
+                _missing_docs = _rd.get("missing", [])
+
+                from services.session_navigator import compute_next_actions as _cna
+                _nav = _cna(
+                    intent=_final_intent,
+                    collected_info=prev_collected,
+                    doc_readiness_score=_doc_score,
+                    conversation_stage=llm_result.conversation_stage or "exploring",
+                    exchange_count=exchange_number,
+                )
+
+                # If all fields filled AND all required docs confirmed,
+                # override generic document-asking suggestions
+                if _nav.get("all_complete") and _doc_score >= 100 and not _missing_docs:
+                    _final_hindi = _override_suggestion_for_complete_state(
+                        llm_hindi=llm_result.suggested_response_hindi,
+                        intent=_final_intent,
+                        nav_phase=_nav.get("phase", ""),
+                        stt_text=stt_result.text,
+                    )
+                    logger.info(
+                        "Suggestion overridden (all complete) | token=%s | phase=%s",
+                        token_number, _nav.get("phase"),
+                    )
+            except Exception as ovr_exc:
+                logger.debug("Suggestion override check failed (non-fatal): %s", ovr_exc)
+
+        # Translate the suggested Hindi response to the customer's language using the dedicated translation service
+        # to prevent hybrid Hindi-Marathi mixed text.
+        source_lang_prefix = (language_code or "hi").split("-")[0].lower()
+        if source_lang_prefix != "hi" and _final_hindi:
+            try:
+                _translated_suggested = await ai_service.translate_text(
+                    text=_final_hindi,
+                    target_language_code=language_code,
+                    source_language_code="hi",
+                )
+                if _translated_suggested:
+                    _final_customer = _translated_suggested
+            except Exception as tr_exc:
+                logger.warning("Failed to translate suggested response: %s", tr_exc)
+
         # Update exchange with translation + sentiment + intent
         await db.execute(
             update(Exchange)
             .where(Exchange.id == exchange.id)
             .values(
                 customer_text_translated=llm_result.translation,
-                staff_response_suggested=llm_result.suggested_response_hindi,
-                staff_response_translated=llm_result.suggested_response_customer_lang,
+                staff_response_suggested=_final_hindi,
+                staff_response_translated=_final_customer,
                 sentiment=llm_result.sentiment,
                 intent=llm_result.intent,
             )
@@ -539,42 +589,7 @@ async def run_transcription_pipeline(
             pii_detected=stt_result.pii_detected,
             exchange_id=exchange.id,
         )
-        # Context-Aware Suggestion: Override LLM suggestion if navigator
-        # detects all fields collected + all docs confirmed
-        _final_hindi = llm_result.suggested_response_hindi
-        _final_customer = llm_result.suggested_response_customer_lang
-        _final_intent = llm_result.intent or pre_intent
 
-        if _final_intent and _final_intent.upper() not in ("GENERAL", ""):
-            try:
-                _rd = compute_readiness(_final_intent, prev_collected)
-                _doc_score = _rd.get("score", 0)
-                _missing_docs = _rd.get("missing", [])
-
-                from services.session_navigator import compute_next_actions as _cna
-                _nav = _cna(
-                    intent=_final_intent,
-                    collected_info=prev_collected,
-                    doc_readiness_score=_doc_score,
-                    conversation_stage=llm_result.conversation_stage or "exploring",
-                    exchange_count=exchange_number,
-                )
-
-                # If all fields filled AND all required docs confirmed,
-                # override generic document-asking suggestions
-                if _nav.get("all_complete") and _doc_score >= 100 and not _missing_docs:
-                    _final_hindi = _override_suggestion_for_complete_state(
-                        llm_hindi=llm_result.suggested_response_hindi,
-                        intent=_final_intent,
-                        nav_phase=_nav.get("phase", ""),
-                        stt_text=stt_result.text,
-                    )
-                    logger.info(
-                        "Suggestion overridden (all complete) | token=%s | phase=%s",
-                        token_number, _nav.get("phase"),
-                    )
-            except Exception as ovr_exc:
-                logger.debug("Suggestion override check failed (non-fatal): %s", ovr_exc)
 
         await ws_manager.broadcast_suggestion(
             token_number=token_number,
